@@ -1,3 +1,6 @@
 markitdown==0.1.1
 gradio==4.44.0
 pytest==8.3.2
+pre-commit==4.5.1
+detect-secrets==1.5.0
+ruff==0.6.9
