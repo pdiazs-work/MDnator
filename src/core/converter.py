@@ -25,14 +25,14 @@ class DocumentConverter:
             result = self._md.convert(file_path)
             text = result.text_content or ""
         except FileNotFoundError:
-            _logger.error("Archivo no encontrado | file=%s", filename)
-            raise RuntimeError("No se encontró el archivo para convertir.")
+            _logger.error("File not found | file=%s", filename)
+            raise RuntimeError("File not found.")
         except PermissionError:
-            _logger.error("Sin permisos para leer | file=%s", filename)
-            raise RuntimeError("Sin permisos para leer el archivo.")
+            _logger.error("Permission denied | file=%s", filename)
+            raise RuntimeError("Permission denied when reading the file.")
         except Exception as exc:
-            _logger.error("Error de conversión | file=%s | error=%s", filename, type(exc).__name__)
-            raise RuntimeError("No se pudo convertir el archivo.") from exc
+            _logger.error("Conversion failed | file=%s | error=%s", filename, type(exc).__name__)
+            raise RuntimeError("Could not convert the file.") from exc
 
         elapsed = time.monotonic() - start
         _logger.info("Conversión exitosa | file=%s | size=%d bytes | tiempo=%.2fs", filename, size, elapsed)

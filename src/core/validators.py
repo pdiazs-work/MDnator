@@ -11,7 +11,7 @@ def validate_extension(filename: str) -> tuple[bool, str]:
     """Check that the file extension is in the allowed list."""
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        return False, f"Extensión '{ext}' no permitida. Formatos aceptados: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        return False, f"File type '{ext}' is not allowed. Accepted formats: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
     return True, ""
 
 
@@ -20,17 +20,17 @@ def validate_size(file_path: str) -> tuple[bool, str]:
     try:
         size = os.path.getsize(file_path)
     except OSError:
-        return False, "No se pudo leer el archivo."
+        return False, "Could not read the file."
     if size > MAX_FILE_SIZE_BYTES:
         mb = size / (1024 * 1024)
-        return False, f"El archivo ({mb:.1f} MB) supera el límite de 20 MB."
+        return False, f"File size ({mb:.1f} MB) exceeds the 20 MB limit."
     return True, ""
 
 
 def validate_file(file_path: str) -> tuple[bool, str]:
     """Run all validation checks on the uploaded file."""
     if not file_path or not os.path.exists(file_path):
-        return False, "No se recibió ningún archivo."
+        return False, "No file was received."
 
     ok, msg = validate_extension(file_path)
     if not ok:
