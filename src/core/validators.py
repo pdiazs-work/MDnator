@@ -11,7 +11,10 @@ def validate_extension(filename: str) -> tuple[bool, str]:
     """Check that the file extension is in the allowed list."""
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        return False, f"File type '{ext}' is not allowed. Accepted formats: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        return (
+            False,
+            f"File type '{ext}' is not allowed. Accepted formats: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
     return True, ""
 
 
@@ -40,5 +43,9 @@ def validate_file(file_path: str) -> tuple[bool, str]:
     if not ok:
         return False, msg
 
-    _logger.info("Archivo válido | tamaño=%d bytes | ruta=%s", os.path.getsize(file_path), Path(file_path).name)
+    _logger.info(
+        "Archivo válido | tamaño=%d bytes | ruta=%s",
+        os.path.getsize(file_path),
+        Path(file_path).name,
+    )
     return True, ""
