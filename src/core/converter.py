@@ -31,9 +31,16 @@ class DocumentConverter:
             _logger.error("Permission denied | file=%s", filename)
             raise RuntimeError("Permission denied when reading the file.")
         except Exception as exc:
-            _logger.error("Conversion failed | file=%s | error=%s", filename, type(exc).__name__)
+            _logger.error(
+                "Conversion failed | file=%s | error=%s", filename, type(exc).__name__
+            )
             raise RuntimeError("Could not convert the file.") from exc
 
         elapsed = time.monotonic() - start
-        _logger.info("Conversión exitosa | file=%s | size=%d bytes | tiempo=%.2fs", filename, size, elapsed)
+        _logger.info(
+            "Conversión exitosa | file=%s | size=%d bytes | tiempo=%.2fs",
+            filename,
+            size,
+            elapsed,
+        )
         return text

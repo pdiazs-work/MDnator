@@ -1,10 +1,5 @@
-import os
-import tempfile
-
-import pytest
-
-from src.core.validators import validate_extension, validate_file, validate_size
 from src.config.settings import MAX_FILE_SIZE_BYTES
+from src.core.validators import validate_extension, validate_file, validate_size
 
 
 def test_extension_invalid():
