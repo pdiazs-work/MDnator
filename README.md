@@ -10,60 +10,83 @@ pinned: false
 license: mit
 ---
 
-# MDnator - Universal Markdown Converter
+# MDnator — Universal Markdown Converter
 
-Convierte documentos a Markdown limpio en segundos, sin instalar nada.
+Convert any document to clean Markdown in seconds. No installation, no sign-up, no data stored.
 
-## Características
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Gradio](https://img.shields.io/badge/Gradio-4.44-orange.svg)](https://gradio.app/)
 
-- **Formatos soportados**: PDF, DOCX, XLSX, PPTX, TXT, CSV, HTML, MD, JSON, XML
-- **Límite de archivo**: 20 MB
-- **Descarga directa** del archivo `.md` generado
-- **Sin registro ni almacenamiento** — los archivos se procesan en memoria y se eliminan automáticamente
+---
 
-## Uso local
+## Features
+
+- **Supported formats**: PDF, DOCX, XLSX, PPTX, TXT, CSV, HTML, MD, JSON, XML
+- **File limit**: 20 MB per file
+- **Direct download** of the generated `.md` file
+- **Privacy first** — files are processed in memory and deleted automatically after conversion
+
+## Local Setup
 
 ```bash
-# 1. Clonar el repositorio
+# Clone the repository
 git clone https://github.com/pdiazs-work/MDnator.git
 cd MDnator
 
-# 2. Crear entorno virtual
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 3. Instalar dependencias
+# Install dependencies
 pip install -r requirements.txt
 
-# 4. Ejecutar la app
+# Run the app
 python app.py
 ```
 
-Abre `http://localhost:7860` en tu navegador.
+Open `http://localhost:7860` in your browser.
 
-## Arquitectura
+## Running Tests
+
+```bash
+pytest tests/ -v
+```
+
+## Architecture
 
 ```
-app.py                  ← Entry point Gradio
+app.py                   ← Gradio entry point
 src/
-  config/settings.py   ← Constantes y configuración
-  core/validators.py   ← Validación de archivos (extensión, tamaño)
-  core/converter.py    ← Motor de conversión con markitdown
-  utils/logger.py      ← Logging estructurado
-tests/                 ← Tests unitarios con pytest
+  config/settings.py    ← Constants and configuration
+  core/validators.py    ← File validation (extension, size)
+  core/converter.py     ← Conversion engine (markitdown)
+  utils/logger.py       ← Structured logging
+tests/                  ← Unit tests (pytest)
 ```
 
 **Stack**: Python 3.10+ · Gradio 4.44 · markitdown (Microsoft) · pytest
 
-## Seguridad
+## Security
 
-- Whitelist estricta de extensiones permitidas
-- Límite de 20 MB por archivo
-- Archivos temporales eliminados automáticamente tras cada conversión
-- Sin persistencia de datos de usuario
-- Logs sin contenido de archivos (solo metadata: nombre, tamaño, tiempo)
-- Sin exposición de stack traces al usuario
+- Strict file extension whitelist
+- 20 MB file size limit
+- Temporary files deleted automatically after each conversion
+- No user data is stored or logged
+- Stack traces never exposed to the user
 
-## Licencia
+## License
 
-MIT — ver [LICENSE](./LICENSE)
+MIT — see [LICENSE](./LICENSE)
+
+---
+
+## Español
+
+Convierte cualquier documento a Markdown limpio en segundos. Sin instalación, sin registro, sin almacenamiento de datos.
+
+**Formatos soportados**: PDF, DOCX, XLSX, PPTX, TXT, CSV, HTML, MD, JSON, XML
+
+**Configuración local**: Clona el repo, crea un entorno virtual, instala `requirements.txt` y ejecuta `python app.py`.
+
+**Seguridad**: Los archivos se procesan en memoria y se eliminan automáticamente. No se guarda ningún dato del usuario.
