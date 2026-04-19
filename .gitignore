@@ -48,3 +48,6 @@ gradio_cached_examples/
 # Temp files generated during conversion
 *.tmp
 tmp/
+
+# Local dev context for Claude Code — NEVER upload to GitHub
+CLAUDE.md
