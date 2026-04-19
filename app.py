@@ -19,34 +19,32 @@ _converter = DocumentConverter()
 
 def process(file_path: str | None):
     if not file_path:
-        raise gr.Error("Por favor sube un archivo antes de convertir.")
+        raise gr.Error("Please upload a file before converting.")
 
     ok, msg = validate_file(file_path)
     if not ok:
         raise gr.Error(msg)
 
-    tmp_out = None
     try:
         markdown = _converter.convert(file_path)
 
-        suffix = ".md"
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=suffix, delete=False, encoding="utf-8"
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
         ) as tmp_out:
             tmp_out.write(markdown)
             tmp_path = tmp_out.name
 
-        return markdown, gr.File(value=tmp_path, visible=True, label="Descargar .md")
+        return markdown, gr.File(value=tmp_path, visible=True, label="Download .md")
 
     except RuntimeError as exc:
-        _logger.error("Error en process | %s", exc)
+        _logger.error("Conversion error | %s", exc)
         raise gr.Error(str(exc))
     except Exception as exc:
-        _logger.error("Error inesperado en process | %s", type(exc).__name__)
-        raise gr.Error("Error inesperado al procesar el archivo.")
+        _logger.error("Unexpected error | %s", type(exc).__name__)
+        raise gr.Error("Unexpected error while processing the file.")
 
 
-file_types = [ext for ext in sorted(ALLOWED_EXTENSIONS)]
+file_types = sorted(ALLOWED_EXTENSIONS)
 
 with gr.Blocks(title=APP_TITLE, theme=gr.themes.Soft()) as demo:
     gr.Markdown(f"# {APP_TITLE}\n{APP_DESCRIPTION}")
@@ -54,21 +52,21 @@ with gr.Blocks(title=APP_TITLE, theme=gr.themes.Soft()) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             file_input = gr.File(
-                label="Sube tu documento",
+                label="Upload your document",
                 file_types=file_types,
                 type="filepath",
             )
-            convert_btn = gr.Button("Convertir a Markdown", variant="primary")
+            convert_btn = gr.Button("Convert to Markdown", variant="primary")
 
         with gr.Column(scale=2):
             output_text = gr.Textbox(
-                label="Resultado en Markdown",
+                label="Markdown output",
                 lines=25,
                 show_copy_button=True,
                 interactive=False,
             )
             download_file = gr.File(
-                label="Descargar .md",
+                label="Download .md",
                 visible=False,
                 interactive=False,
             )
