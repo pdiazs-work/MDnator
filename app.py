@@ -20,6 +20,8 @@ from src.utils.logger import get_logger
 _logger = get_logger(__name__)
 _converter = DocumentConverter()
 
+_PREVIEW_PLACEHOLDER = "*Convert a document to see the rendered preview.*"
+
 
 def _compute_stats(markdown: str, elapsed: float, file_count: int = 1) -> str:
     words = len(markdown.split())
@@ -99,11 +101,20 @@ def process(file_paths: list[str] | str | None):
     )
 
 
+def clear():
+    return (
+        None,
+        gr.update(value=None, visible=False),
+        _PREVIEW_PLACEHOLDER,
+        gr.update(value="", visible=False),
+    )
+
+
 _file_types = sorted(ALLOWED_EXTENSIONS)
 _formats_hint = ", ".join(sorted(ext.lstrip(".").upper() for ext in ALLOWED_EXTENSIONS))
 
 with gr.Blocks(title=APP_TITLE) as demo:
-    gr.Markdown(f"# {APP_TITLE}\n{APP_DESCRIPTION}")
+    gr.Markdown(f"# {APP_TITLE}\n\n{APP_DESCRIPTION}")
 
     with gr.Row():
         with gr.Column(scale=1):
@@ -112,12 +123,17 @@ with gr.Blocks(title=APP_TITLE) as demo:
                 file_types=_file_types,
                 file_count="multiple",
                 type="filepath",
+                height=160,
             )
             gr.Markdown(
                 f"**Formats:** {_formats_hint}  \n"
-                f"**Max size:** {MAX_FILE_SIZE_MB} MB per file · up to {MAX_BATCH_FILES} files"
+                f"**Limit:** {MAX_FILE_SIZE_MB} MB per file · max {MAX_BATCH_FILES} files"
             )
-            convert_btn = gr.Button("Convert to Markdown", variant="primary", size="lg")
+            with gr.Row():
+                convert_btn = gr.Button(
+                    "Convert", variant="primary", size="lg", scale=3
+                )
+                clear_btn = gr.Button("Clear", variant="secondary", size="lg", scale=1)
             download_file = gr.File(
                 label="Download .md",
                 visible=False,
@@ -136,7 +152,8 @@ with gr.Blocks(title=APP_TITLE) as demo:
                     )
                 with gr.Tab("Preview"):
                     output_preview = gr.Markdown(
-                        value="*Convert a document to see the rendered preview.*"
+                        value=_PREVIEW_PLACEHOLDER,
+                        max_height=600,
                     )
             stats_output = gr.Textbox(
                 label="Stats",
@@ -146,11 +163,10 @@ with gr.Blocks(title=APP_TITLE) as demo:
                 max_lines=1,
             )
 
-    convert_btn.click(
-        fn=process,
-        inputs=[file_input],
-        outputs=[output_text, download_file, output_preview, stats_output],
-    )
+    _outputs = [output_text, download_file, output_preview, stats_output]
+
+    convert_btn.click(fn=process, inputs=[file_input], outputs=_outputs)
+    clear_btn.click(fn=clear, outputs=[file_input] + _outputs)
 
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=MAX_CONCURRENT_USERS).launch(

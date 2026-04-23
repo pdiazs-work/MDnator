@@ -16,7 +16,7 @@ ALLOWED_EXTENSIONS = frozenset(
     }
 )
 
-APP_TITLE = "MDnator - Universal Markdown Converter"
-APP_DESCRIPTION = "Convert any document to clean Markdown in seconds."
+APP_TITLE = "MDnator — Universal Markdown Converter"
+APP_DESCRIPTION = "Upload one or more documents and get clean Markdown instantly. No sign-up, no data stored."
 MAX_CONCURRENT_USERS = 2
 MAX_BATCH_FILES = 5
