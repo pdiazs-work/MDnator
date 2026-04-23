@@ -45,7 +45,7 @@ def process(file_path: str | None):
 
 file_types = sorted(ALLOWED_EXTENSIONS)
 
-with gr.Blocks(title=APP_TITLE, theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title=APP_TITLE) as demo:
     gr.Markdown(f"# {APP_TITLE}\n{APP_DESCRIPTION}")
 
     with gr.Row():
@@ -77,4 +77,6 @@ with gr.Blocks(title=APP_TITLE, theme=gr.themes.Soft()) as demo:
     )
 
 if __name__ == "__main__":
-    demo.queue(default_concurrency_limit=MAX_CONCURRENT_USERS).launch()
+    demo.queue(default_concurrency_limit=MAX_CONCURRENT_USERS).launch(
+        theme=gr.themes.Soft()
+    )
