@@ -14,6 +14,7 @@ license: mit
 
 Convert any document to clean Markdown in seconds. No installation, no sign-up, no data stored.
 
+[![Try on Hugging Face](https://img.shields.io/badge/🤗-Try%20on%20HF-yellow)](https://huggingface.co/spaces/pdiazs-work/MDnator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Gradio](https://img.shields.io/badge/Gradio-6.12-orange.svg)](https://gradio.app/)
