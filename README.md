@@ -48,6 +48,19 @@ python app.py
 
 Open `http://localhost:7860` in your browser.
 
+## CLI Usage
+
+```bash
+# Single file to stdout
+python cli.py document.pdf
+
+# Single file saved to disk
+python cli.py report.docx -o report.md
+
+# Batch — multiple files combined into one output
+python cli.py *.txt -o combined.md
+```
+
 ## Running Tests
 
 ```bash
