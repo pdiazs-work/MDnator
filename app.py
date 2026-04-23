@@ -61,8 +61,8 @@ with gr.Blocks(title=APP_TITLE) as demo:
             output_text = gr.Textbox(
                 label="Markdown output",
                 lines=25,
-                show_copy_button=True,
                 interactive=False,
+                buttons=["copy"],
             )
             download_file = gr.File(
                 label="Download .md",
