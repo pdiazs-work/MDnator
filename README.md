@@ -4,7 +4,7 @@ emoji: 📄
 colorFrom: indigo
 colorTo: purple
 sdk: gradio
-sdk_version: 4.44.0
+sdk_version: 6.12.0
 app_file: app.py
 pinned: false
 license: mit
@@ -16,7 +16,7 @@ Convert any document to clean Markdown in seconds. No installation, no sign-up, 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Gradio](https://img.shields.io/badge/Gradio-4.44-orange.svg)](https://gradio.app/)
+[![Gradio](https://img.shields.io/badge/Gradio-6.12-orange.svg)](https://gradio.app/)
 
 ---
 
@@ -38,8 +38,8 @@ cd MDnator
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (includes dev tools)
+pip install -r requirements-dev.txt
 
 # Run the app
 python app.py
@@ -65,7 +65,7 @@ src/
 tests/                  ← Unit tests (pytest)
 ```
 
-**Stack**: Python 3.10+ · Gradio 4.44 · markitdown (Microsoft) · pytest
+**Stack**: Python 3.10+ · Gradio 6.12 · markitdown (Microsoft) · pytest
 
 ## Security
 
