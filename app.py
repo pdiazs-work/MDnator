@@ -1,3 +1,4 @@
+import os
 import re
 import tempfile
 import time
@@ -8,6 +9,7 @@ from src.config.settings import (
     ALLOWED_EXTENSIONS,
     APP_DESCRIPTION,
     APP_TITLE,
+    MAX_BATCH_FILES,
     MAX_CONCURRENT_USERS,
     MAX_FILE_SIZE_MB,
 )
@@ -38,23 +40,47 @@ def _compute_stats(markdown: str, elapsed: float, file_count: int = 1) -> str:
     return " · ".join(parts)
 
 
-def process(file_path: str | None):
-    if not file_path:
+def process(file_paths: list[str] | str | None):
+    if not file_paths:
         raise gr.Error("Please upload a file before converting.")
 
-    ok, msg = validate_file(file_path)
-    if not ok:
-        raise gr.Error(msg)
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
 
+    if len(file_paths) > MAX_BATCH_FILES:
+        raise gr.Error(f"Maximum {MAX_BATCH_FILES} files at once.")
+
+    results = []
+    errors = []
     start = time.monotonic()
-    try:
-        markdown = _converter.convert(file_path)
-    except RuntimeError as exc:
-        _logger.error("Conversion error | %s", exc)
-        raise gr.Error(str(exc))
-    except Exception as exc:
-        _logger.error("Unexpected error | %s", type(exc).__name__)
-        raise gr.Error("Unexpected error while processing the file.")
+
+    for fp in file_paths:
+        name = os.path.basename(fp)
+        ok, msg = validate_file(fp)
+        if not ok:
+            errors.append(f"**{name}**: {msg}")
+            continue
+        try:
+            md = _converter.convert(fp)
+            header = f"## {name}\n\n" if len(file_paths) > 1 else ""
+            results.append(f"{header}{md}")
+        except RuntimeError as exc:
+            _logger.error("Conversion error | file=%s | %s", name, exc)
+            errors.append(f"**{name}**: {exc}")
+        except Exception as exc:
+            _logger.error("Unexpected error | file=%s | %s", name, type(exc).__name__)
+            errors.append(f"**{name}**: Unexpected error.")
+
+    if not results:
+        detail = "\n".join(errors)
+        raise gr.Error(f"No files converted successfully.\n{detail}")
+
+    markdown = "\n\n---\n\n".join(results)
+    if errors:
+        markdown += "\n\n---\n\n> **Some files could not be converted:**\n" + "\n".join(
+            f"> {e}" for e in errors
+        )
+
     elapsed = time.monotonic() - start
 
     with tempfile.NamedTemporaryFile(
@@ -63,7 +89,7 @@ def process(file_path: str | None):
         tmp_out.write(markdown)
         tmp_path = tmp_out.name
 
-    stats = _compute_stats(markdown, elapsed)
+    stats = _compute_stats(markdown, elapsed, file_count=len(results))
 
     return (
         markdown,
@@ -82,12 +108,14 @@ with gr.Blocks(title=APP_TITLE) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             file_input = gr.File(
-                label="Upload your document",
+                label="Upload document(s)",
                 file_types=_file_types,
+                file_count="multiple",
                 type="filepath",
             )
             gr.Markdown(
-                f"**Formats:** {_formats_hint}  \n**Max size:** {MAX_FILE_SIZE_MB} MB"
+                f"**Formats:** {_formats_hint}  \n"
+                f"**Max size:** {MAX_FILE_SIZE_MB} MB per file · up to {MAX_BATCH_FILES} files"
             )
             convert_btn = gr.Button("Convert to Markdown", variant="primary", size="lg")
             download_file = gr.File(
