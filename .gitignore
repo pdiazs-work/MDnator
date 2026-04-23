@@ -51,3 +51,4 @@ tmp/
 
 # Local dev context for Claude Code — NEVER upload to GitHub
 CLAUDE.md
+.scratch/
