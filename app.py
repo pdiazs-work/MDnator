@@ -42,7 +42,7 @@ def _compute_stats(markdown: str, elapsed: float, file_count: int = 1) -> str:
     return " · ".join(parts)
 
 
-def process(file_paths: list[str] | str | None):
+def process(file_paths: list[str] | str | None, progress: gr.Progress = gr.Progress()):
     if not file_paths:
         raise gr.Error("Please upload a file before converting.")
 
@@ -55,16 +55,20 @@ def process(file_paths: list[str] | str | None):
     results = []
     errors = []
     start = time.monotonic()
+    total = len(file_paths)
 
-    for fp in file_paths:
+    progress(0, desc="Starting…")
+    for i, fp in enumerate(file_paths):
         name = os.path.basename(fp)
+        progress((i) / total, desc=f"Converting {name}…")
         ok, msg = validate_file(fp)
         if not ok:
             errors.append(f"**{name}**: {msg}")
+            progress((i + 1) / total, desc=f"Skipped {name}")
             continue
         try:
             md = _converter.convert(fp)
-            header = f"## {name}\n\n" if len(file_paths) > 1 else ""
+            header = f"## {name}\n\n" if total > 1 else ""
             results.append(f"{header}{md}")
         except RuntimeError as exc:
             _logger.error("Conversion error | file=%s | %s", name, exc)
@@ -72,11 +76,13 @@ def process(file_paths: list[str] | str | None):
         except Exception as exc:
             _logger.error("Unexpected error | file=%s | %s", name, type(exc).__name__)
             errors.append(f"**{name}**: Unexpected error.")
+        progress((i + 1) / total, desc=f"Done {name}")
 
     if not results:
         detail = "\n".join(errors)
         raise gr.Error(f"No files converted successfully.\n{detail}")
 
+    progress(1, desc="Building output…")
     markdown = "\n\n---\n\n".join(results)
     if errors:
         markdown += "\n\n---\n\n> **Some files could not be converted:**\n" + "\n".join(
@@ -103,10 +109,11 @@ def process(file_paths: list[str] | str | None):
 
 def clear():
     return (
-        None,
-        gr.update(value=None, visible=False),
-        _PREVIEW_PLACEHOLDER,
-        gr.update(value="", visible=False),
+        gr.update(value=None),  # file_input
+        gr.update(value=None),  # output_text
+        gr.update(value=None, visible=False),  # download_file
+        _PREVIEW_PLACEHOLDER,  # output_preview
+        gr.update(value="", visible=False),  # stats_output
     )
 
 
