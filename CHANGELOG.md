@@ -16,6 +16,15 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-04-24
+
+### Changed
+- Tab labels now include emoji icons (📄 Documents, 🔗 From URL, ✏️ Plain Text)
+- URL placeholder updated to a real-world example; hint clarifies best use cases
+- Plain Text placeholder rewritten to be action-oriented
+- Clear button promoted to `lg` size with icon, placed inline with Download
+- APP_DESCRIPTION updated to mention all 3 input modes
+
 ## [1.2.0] — 2026-04-24
 
 ### Added
