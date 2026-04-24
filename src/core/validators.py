@@ -10,13 +10,16 @@ _logger = get_logger(__name__)
 # Gradio always writes uploaded files to the system temp directory.
 # We enforce this so that no path traversal outside temp is possible.
 _TEMP_DIR = Path(tempfile.gettempdir()).resolve()
+_TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 
 
 def _safe_path(file_path: str) -> Path | None:
     """Resolve file_path and verify it lives inside the system temp directory."""
     try:
-        resolved = Path(os.path.abspath(file_path)).resolve()
-        resolved.relative_to(_TEMP_DIR)  # raises ValueError if not under temp
+        real = os.path.realpath(os.path.abspath(file_path))
+        if not real.startswith(_TEMP_DIR_STR):
+            return None
+        resolved = Path(real)
         return resolved
     except (ValueError, OSError):
         return None

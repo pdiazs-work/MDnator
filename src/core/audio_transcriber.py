@@ -9,21 +9,29 @@ from src.utils.logger import get_logger
 _logger = get_logger(__name__)
 
 _TEMP_DIR = Path(tempfile.gettempdir()).resolve()
+_TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 
 AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4"})
 
 _MAX_AUDIO_MB = 25  # OpenAI Whisper API hard limit is 25 MB
 
 
+def _safe_audio_path(file_path: str) -> Path | None:
+    """Resolve and verify the path is inside the system temp directory."""
+    try:
+        real = os.path.realpath(os.path.abspath(file_path))
+        if not real.startswith(_TEMP_DIR_STR):
+            return None
+        return Path(real)
+    except (ValueError, OSError):
+        return None
+
+
 def validate_audio_file(file_path: str) -> tuple[bool, str]:
     if not file_path:
         return False, "no_audio"
-    resolved = Path(os.path.abspath(file_path)).resolve()
-    try:
-        resolved.relative_to(_TEMP_DIR)
-    except ValueError:
-        return False, "no_audio"
-    if not resolved.is_file():
+    resolved = _safe_audio_path(file_path)
+    if resolved is None or not resolved.is_file():
         return False, "no_audio"
     ext = resolved.suffix.lower()
     if ext not in AUDIO_EXTENSIONS:
@@ -53,13 +61,16 @@ def transcribe_audio(file_path: str, api_key: str) -> str:
             "openai package not installed. Add 'openai' to requirements.txt."
         )
 
-    resolved = Path(os.path.abspath(file_path)).resolve()
+    real = os.path.realpath(os.path.abspath(file_path))
+    if not real.startswith(_TEMP_DIR_STR):
+        raise RuntimeError("Invalid audio file path.")
+    resolved = Path(real)
     filename = resolved.name
 
     _logger.info("Audio transcription start | file=%s", filename)
     try:
         client = OpenAI(api_key=api_key.strip())
-        with open(str(resolved), "rb") as audio_file:
+        with open(real, "rb") as audio_file:
             response = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
