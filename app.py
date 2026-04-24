@@ -2,6 +2,7 @@ import os
 import re
 import tempfile
 import time
+from urllib.parse import urlparse
 
 import gradio as gr
 
@@ -14,6 +15,7 @@ from src.config.settings import (
     MAX_FILE_SIZE_MB,
 )
 from src.core.converter import DocumentConverter
+from src.core.text_formatter import format_plain_text
 from src.core.url_fetcher import fetch_url, validate_url
 from src.core.validators import validate_file
 from src.utils.logger import get_logger
@@ -127,6 +129,7 @@ def process_url(url: str, progress: gr.Progress = gr.Progress()):
         raise gr.Error(str(exc))
 
     progress(0.6, desc="Converting to Markdown…")
+    tmp_html_path = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".html", delete=False, encoding="utf-8"
@@ -138,25 +141,38 @@ def process_url(url: str, progress: gr.Progress = gr.Progress()):
     except RuntimeError as exc:
         raise gr.Error(f"Conversion failed: {exc}")
     finally:
-        try:
-            os.unlink(tmp_html_path)
-        except OSError:
-            pass
+        if tmp_html_path:
+            try:
+                os.unlink(tmp_html_path)
+            except OSError:
+                pass
 
     if not markdown.strip():
         raise gr.Error("The page returned no readable content.")
 
     progress(1, desc="Done")
-    from urllib.parse import urlparse
-
     domain = urlparse(url).netloc
     return _emit(markdown, time.monotonic() - start, label=domain)
+
+
+def process_text(raw_text: str):
+    if not raw_text or not raw_text.strip():
+        raise gr.Error("Please paste some text before formatting.")
+
+    start = time.monotonic()
+    markdown = format_plain_text(raw_text)
+
+    if not markdown.strip():
+        raise gr.Error("No content could be extracted from the input.")
+
+    return _emit(markdown, time.monotonic() - start, label="plain text")
 
 
 def clear():
     return (
         gr.update(value=None),  # file_input
         gr.update(value=""),  # url_input
+        gr.update(value=""),  # text_input
         gr.update(value=None),  # output_text
         gr.update(value=None, visible=False),  # download_file
         _PREVIEW_PLACEHOLDER,  # output_preview
@@ -205,8 +221,25 @@ with gr.Blocks(title=APP_TITLE) as demo:
                         "Fetch & Convert", variant="primary", size="lg"
                     )
 
+                with gr.Tab("Plain Text"):
+                    text_input = gr.Textbox(
+                        label="Paste plain text",
+                        placeholder="Paste any unstructured text here.\n\nMDnator will detect headings, lists, code blocks and convert to organised Markdown.",
+                        lines=12,
+                        max_lines=40,
+                    )
+                    gr.Markdown(
+                        "Detects **headings** (ALL CAPS or Title Case), "
+                        "**lists** (-, *, •, 1.), "
+                        "**code blocks** (``` or 4-space indent), "
+                        "and **paragraphs** automatically."
+                    )
+                    convert_text_btn = gr.Button(
+                        "Format as Markdown", variant="primary", size="lg"
+                    )
+
             with gr.Row():
-                clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                clear_btn = gr.Button("Clear all", variant="secondary", size="sm")
             download_file = gr.File(
                 label="Download .md",
                 visible=False,
@@ -240,7 +273,8 @@ with gr.Blocks(title=APP_TITLE) as demo:
 
     convert_files_btn.click(fn=process_files, inputs=[file_input], outputs=_outputs)
     convert_url_btn.click(fn=process_url, inputs=[url_input], outputs=_outputs)
-    clear_btn.click(fn=clear, outputs=[file_input, url_input] + _outputs)
+    convert_text_btn.click(fn=process_text, inputs=[text_input], outputs=_outputs)
+    clear_btn.click(fn=clear, outputs=[file_input, url_input, text_input] + _outputs)
 
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=MAX_CONCURRENT_USERS).launch(
