@@ -1,6 +1,6 @@
 import ipaddress
 import socket
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 import requests
 
@@ -37,6 +37,21 @@ def validate_url(url: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _safe_url(url: str) -> str:
+    """Reconstruct URL from parsed components to avoid passing raw user input to requests."""
+    parsed = urlparse(url.strip())
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            "",  # strip fragment — not sent to server anyway
+        )
+    )
+
+
 def fetch_url(url: str) -> str:
     """Fetch URL and return its HTML/text content as a string.
 
@@ -47,9 +62,11 @@ def fetch_url(url: str) -> str:
     if not ok:
         raise RuntimeError(msg)
 
+    safe = _safe_url(url)
+
     try:
         resp = requests.get(
-            url,
+            safe,
             timeout=_TIMEOUT,
             stream=True,
             headers={
@@ -58,12 +75,14 @@ def fetch_url(url: str) -> str:
         )
         resp.raise_for_status()
     except requests.exceptions.Timeout:
-        _logger.warning("URL fetch timeout | url=%s", url)
+        _logger.warning("URL fetch timeout | url=%s", safe)
         raise RuntimeError("Request timed out (15 s). Try a smaller page.")
     except requests.exceptions.TooManyRedirects:
         raise RuntimeError("Too many redirects.")
     except requests.exceptions.RequestException as exc:
-        _logger.warning("URL fetch failed | url=%s | error=%s", url, type(exc).__name__)
+        _logger.warning(
+            "URL fetch failed | url=%s | error=%s", safe, type(exc).__name__
+        )
         raise RuntimeError(f"Could not fetch URL: {exc}")
 
     content_type = resp.headers.get("Content-Type", "").split(";")[0].strip()
@@ -76,7 +95,7 @@ def fetch_url(url: str) -> str:
         total += len(chunk)
         if total > MAX_FILE_SIZE_BYTES:
             raise RuntimeError(
-                f"Response exceeds {MAX_FILE_SIZE_BYTES // (1024*1024)} MB limit."
+                f"Response exceeds {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB limit."
             )
         chunks.append(chunk)
 

@@ -18,11 +18,14 @@ class DocumentConverter:
     def convert(self, file_path: str) -> str:
         """Convert the file at file_path to a Markdown string."""
         start = time.monotonic()
-        filename = Path(file_path).name
+
+        # Resolve to canonical path before any file operations
+        resolved = Path(os.path.abspath(file_path))
+        filename = resolved.name
 
         try:
-            size = os.path.getsize(file_path)
-            result = self._md.convert(file_path)
+            size = resolved.stat().st_size
+            result = self._md.convert(str(resolved))
             text = result.text_content or ""
         except FileNotFoundError:
             _logger.error("File not found | file=%s", filename)
