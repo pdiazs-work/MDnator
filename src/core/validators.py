@@ -1,10 +1,25 @@
 import os
+import tempfile
 from pathlib import Path
 
 from src.config.settings import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES
 from src.utils.logger import get_logger
 
 _logger = get_logger(__name__)
+
+# Gradio always writes uploaded files to the system temp directory.
+# We enforce this so that no path traversal outside temp is possible.
+_TEMP_DIR = Path(tempfile.gettempdir()).resolve()
+
+
+def _safe_path(file_path: str) -> Path | None:
+    """Resolve file_path and verify it lives inside the system temp directory."""
+    try:
+        resolved = Path(os.path.abspath(file_path)).resolve()
+        resolved.relative_to(_TEMP_DIR)  # raises ValueError if not under temp
+        return resolved
+    except (ValueError, OSError):
+        return None
 
 
 def validate_extension(filename: str) -> tuple[bool, str]:
@@ -35,9 +50,8 @@ def validate_file(file_path: str) -> tuple[bool, str]:
     if not file_path:
         return False, "No file was received."
 
-    # Resolve to an absolute path so all downstream operations work on a canonical path
-    resolved = Path(os.path.abspath(file_path))
-    if not resolved.is_file():
+    resolved = _safe_path(file_path)
+    if resolved is None or not resolved.is_file():
         return False, "No file was received."
 
     ok, msg = validate_extension(resolved.name)

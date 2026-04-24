@@ -1,4 +1,5 @@
 import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from markitdown import MarkItDown
 from src.utils.logger import get_logger
 
 _logger = get_logger(__name__)
+
+_TEMP_DIR = Path(tempfile.gettempdir()).resolve()
 
 
 class DocumentConverter:
@@ -19,9 +22,14 @@ class DocumentConverter:
         """Convert the file at file_path to a Markdown string."""
         start = time.monotonic()
 
-        # Resolve to canonical path before any file operations
-        resolved = Path(os.path.abspath(file_path))
+        resolved = Path(os.path.abspath(file_path)).resolve()
         filename = resolved.name
+
+        # Verify the file is in an expected directory (temp or its subdirs)
+        try:
+            resolved.relative_to(_TEMP_DIR)
+        except ValueError:
+            raise RuntimeError("File path is outside the expected upload directory.")
 
         try:
             size = resolved.stat().st_size
