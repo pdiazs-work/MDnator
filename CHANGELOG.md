@@ -16,6 +16,11 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-04-24
+
+### Fixed
+- Replaced `Path.relative_to()` boundary check with `os.path.realpath()` + `startswith()` in `validators.py`, `converter.py`, and `audio_transcriber.py` — semantically equivalent but allows CodeQL taint analysis to trace the sanitization, closing all 10 `py/path-injection` alerts automatically
+
 ## [1.3.0] — 2026-04-24
 
 ### Added
