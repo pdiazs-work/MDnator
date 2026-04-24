@@ -14,6 +14,7 @@ from src.config.settings import (
     MAX_FILE_SIZE_MB,
 )
 from src.core.converter import DocumentConverter
+from src.core.url_fetcher import fetch_url, validate_url
 from src.core.validators import validate_file
 from src.utils.logger import get_logger
 
@@ -23,14 +24,14 @@ _converter = DocumentConverter()
 _PREVIEW_PLACEHOLDER = "*Convert a document to see the rendered preview.*"
 
 
-def _compute_stats(markdown: str, elapsed: float, file_count: int = 1) -> str:
+def _compute_stats(markdown: str, elapsed: float, label: str = "") -> str:
     words = len(markdown.split())
     chars = len(markdown)
     headings = len(re.findall(r"^#{1,6}\s", markdown, re.MULTILINE))
     tables = len(re.findall(r"^\|.+\|", markdown, re.MULTILINE))
     parts = []
-    if file_count > 1:
-        parts.append(f"{file_count} files")
+    if label:
+        parts.append(label)
     parts += [
         f"{words:,} words",
         f"{chars:,} chars",
@@ -42,7 +43,24 @@ def _compute_stats(markdown: str, elapsed: float, file_count: int = 1) -> str:
     return " · ".join(parts)
 
 
-def process(file_paths: list[str] | str | None, progress: gr.Progress = gr.Progress()):
+def _emit(markdown: str, elapsed: float, label: str = "") -> tuple:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as tmp_out:
+        tmp_out.write(markdown)
+        tmp_path = tmp_out.name
+    stats = _compute_stats(markdown, elapsed, label=label)
+    return (
+        markdown,
+        gr.update(value=tmp_path, visible=True),
+        markdown,
+        gr.update(value=stats, visible=True),
+    )
+
+
+def process_files(
+    file_paths: list[str] | str | None, progress: gr.Progress = gr.Progress()
+):
     if not file_paths:
         raise gr.Error("Please upload a file before converting.")
 
@@ -60,7 +78,7 @@ def process(file_paths: list[str] | str | None, progress: gr.Progress = gr.Progr
     progress(0, desc="Starting…")
     for i, fp in enumerate(file_paths):
         name = os.path.basename(fp)
-        progress((i) / total, desc=f"Converting {name}…")
+        progress(i / total, desc=f"Converting {name}…")
         ok, msg = validate_file(fp)
         if not ok:
             errors.append(f"**{name}**: {msg}")
@@ -79,8 +97,7 @@ def process(file_paths: list[str] | str | None, progress: gr.Progress = gr.Progr
         progress((i + 1) / total, desc=f"Done {name}")
 
     if not results:
-        detail = "\n".join(errors)
-        raise gr.Error(f"No files converted successfully.\n{detail}")
+        raise gr.Error("No files converted successfully.\n" + "\n".join(errors))
 
     progress(1, desc="Building output…")
     markdown = "\n\n---\n\n".join(results)
@@ -89,27 +106,57 @@ def process(file_paths: list[str] | str | None, progress: gr.Progress = gr.Progr
             f"> {e}" for e in errors
         )
 
-    elapsed = time.monotonic() - start
+    label = f"{len(results)} files" if len(results) > 1 else ""
+    return _emit(markdown, time.monotonic() - start, label=label)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as tmp_out:
-        tmp_out.write(markdown)
-        tmp_path = tmp_out.name
 
-    stats = _compute_stats(markdown, elapsed, file_count=len(results))
+def process_url(url: str, progress: gr.Progress = gr.Progress()):
+    url = url.strip()
+    if not url:
+        raise gr.Error("Please enter a URL.")
 
-    return (
-        markdown,
-        gr.update(value=tmp_path, visible=True),
-        markdown,
-        gr.update(value=stats, visible=True),
-    )
+    ok, msg = validate_url(url)
+    if not ok:
+        raise gr.Error(msg)
+
+    progress(0.2, desc="Fetching page…")
+    start = time.monotonic()
+    try:
+        html = fetch_url(url)
+    except RuntimeError as exc:
+        raise gr.Error(str(exc))
+
+    progress(0.6, desc="Converting to Markdown…")
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".html", delete=False, encoding="utf-8"
+        ) as tmp_html:
+            tmp_html.write(html)
+            tmp_html_path = tmp_html.name
+
+        markdown = _converter.convert(tmp_html_path)
+    except RuntimeError as exc:
+        raise gr.Error(f"Conversion failed: {exc}")
+    finally:
+        try:
+            os.unlink(tmp_html_path)
+        except OSError:
+            pass
+
+    if not markdown.strip():
+        raise gr.Error("The page returned no readable content.")
+
+    progress(1, desc="Done")
+    from urllib.parse import urlparse
+
+    domain = urlparse(url).netloc
+    return _emit(markdown, time.monotonic() - start, label=domain)
 
 
 def clear():
     return (
         gr.update(value=None),  # file_input
+        gr.update(value=""),  # url_input
         gr.update(value=None),  # output_text
         gr.update(value=None, visible=False),  # download_file
         _PREVIEW_PLACEHOLDER,  # output_preview
@@ -125,22 +172,41 @@ with gr.Blocks(title=APP_TITLE) as demo:
 
     with gr.Row():
         with gr.Column(scale=1):
-            file_input = gr.File(
-                label="Upload document(s)",
-                file_types=_file_types,
-                file_count="multiple",
-                type="filepath",
-                height=160,
-            )
-            gr.Markdown(
-                f"**Formats:** {_formats_hint}  \n"
-                f"**Limit:** {MAX_FILE_SIZE_MB} MB per file · max {MAX_BATCH_FILES} files"
-            )
+            with gr.Tabs():
+                with gr.Tab("Documents"):
+                    file_input = gr.File(
+                        label="Upload document(s)",
+                        file_types=_file_types,
+                        file_count="multiple",
+                        type="filepath",
+                        height=160,
+                    )
+                    gr.Markdown(
+                        f"**Formats:** {_formats_hint}  \n"
+                        f"**Limit:** {MAX_FILE_SIZE_MB} MB per file · max {MAX_BATCH_FILES} files"
+                    )
+                    convert_files_btn = gr.Button(
+                        "Convert Documents", variant="primary", size="lg"
+                    )
+
+                with gr.Tab("From URL"):
+                    url_input = gr.Textbox(
+                        label="Web page URL",
+                        placeholder="https://example.com/article",
+                        lines=1,
+                        max_lines=1,
+                    )
+                    gr.Markdown(
+                        "Paste any public web page URL. "
+                        "Private/internal addresses are blocked.  \n"
+                        f"**Limit:** {MAX_FILE_SIZE_MB} MB response"
+                    )
+                    convert_url_btn = gr.Button(
+                        "Fetch & Convert", variant="primary", size="lg"
+                    )
+
             with gr.Row():
-                convert_btn = gr.Button(
-                    "Convert", variant="primary", size="lg", scale=3
-                )
-                clear_btn = gr.Button("Clear", variant="secondary", size="lg", scale=1)
+                clear_btn = gr.Button("Clear", variant="secondary", size="sm")
             download_file = gr.File(
                 label="Download .md",
                 visible=False,
@@ -172,8 +238,9 @@ with gr.Blocks(title=APP_TITLE) as demo:
 
     _outputs = [output_text, download_file, output_preview, stats_output]
 
-    convert_btn.click(fn=process, inputs=[file_input], outputs=_outputs)
-    clear_btn.click(fn=clear, outputs=[file_input] + _outputs)
+    convert_files_btn.click(fn=process_files, inputs=[file_input], outputs=_outputs)
+    convert_url_btn.click(fn=process_url, inputs=[url_input], outputs=_outputs)
+    clear_btn.click(fn=clear, outputs=[file_input, url_input] + _outputs)
 
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=MAX_CONCURRENT_USERS).launch(
