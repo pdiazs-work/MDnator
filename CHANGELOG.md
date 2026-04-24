@@ -16,6 +16,23 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-04-24
+
+### Added
+- **Language selector**: 10 languages (EN, ES, FR, DE, PT, ZH, JA, AR, RU, IT) — changes entire UI instantly via `gr.update()`, no page reload
+- **YouTube tab**: extracts transcript via `youtube-transcript-api`; groups snippets into 60s paragraphs with `[MM:SS]` timestamps; no API key required
+- **Audio tab**: transcribes audio files via OpenAI Whisper API (`whisper-1`); user supplies API key per session; supports MP3/WAV/M4A/OGG/FLAC/WEBM/MP4 up to 25 MB
+- `src/i18n/translations.py`: ~50 UI string keys × 10 languages; `t(lang, key, **kwargs)` helper with EN fallback; no external services, commercial-safe
+- `src/core/youtube_fetcher.py`: URL validation (4 YouTube URL patterns), video ID extraction, transcript fetch with graceful fallback
+- `src/core/audio_transcriber.py`: temp-dir boundary validation, size limit check, Whisper API call with language + duration metadata in output
+
+### Changed
+- `app.py` fully rewritten: all process functions accept `lang_display` param; `update_ui()` returns 21 `gr.update()` objects wired to `lang_selector.change()`; `clear()` resets all 5 input fields
+- `requirements.txt`: added `openai==2.32.0`
+
+### Tests
+- 87 passing (added `test_youtube_fetcher.py`, `test_audio_transcriber.py`, `test_translations.py` — 46 new tests)
+
 ## [1.2.1] — 2026-04-24
 
 ### Changed
