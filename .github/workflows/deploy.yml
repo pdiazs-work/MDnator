@@ -1,0 +1,23 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config user.email "ci@mdnator"
+          git config user.name "MDnator CI"
+          git remote add space https://pdiazs-work:${HF_TOKEN}@huggingface.co/spaces/pdiazs-work/MDnator
+          git push space HEAD:main --force
