@@ -16,6 +16,25 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-04-24
+
+### Added
+- Plain Text input tab: paste unstructured text and get organised Markdown
+- Heuristic formatter (`src/core/text_formatter.py`): detects ALL CAPS / Title Case headings,
+  bullet lists (-, *, •, 1.), code blocks (``` or 4-space indent), paragraphs
+- Output preview works as an Obsidian-style live viewer
+
+## [1.1.0] — 2026-04-24
+
+### Added
+- URL-to-Markdown tab: fetch any public web page and convert its HTML to Markdown
+- SSRF protection: blocks private/loopback/reserved IPs, http/https only, 15s timeout, 20MB cap
+- `requests==2.33.1` pinned in requirements.txt
+
+### Security
+- Enforce temp-dir boundary in validators and converter (path traversal impossible)
+- URL reconstructed from parsed components before HTTP call (eliminates raw-input taint)
+
 ## [1.0.0] — 2026-04-24
 
 ### Added
