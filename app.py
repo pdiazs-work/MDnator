@@ -189,7 +189,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             with gr.Tabs():
-                with gr.Tab("Documents"):
+                with gr.Tab("📄 Documents"):
                     file_input = gr.File(
                         label="Upload document(s)",
                         file_types=_file_types,
@@ -199,62 +199,65 @@ with gr.Blocks(title=APP_TITLE) as demo:
                     )
                     gr.Markdown(
                         f"**Formats:** {_formats_hint}  \n"
-                        f"**Limit:** {MAX_FILE_SIZE_MB} MB per file · max {MAX_BATCH_FILES} files"
+                        f"**Limit:** {MAX_FILE_SIZE_MB} MB · max {MAX_BATCH_FILES} files"
                     )
                     convert_files_btn = gr.Button(
-                        "Convert Documents", variant="primary", size="lg"
+                        "Convert to Markdown", variant="primary", size="lg"
                     )
 
-                with gr.Tab("From URL"):
+                with gr.Tab("🔗 From URL"):
                     url_input = gr.Textbox(
                         label="Web page URL",
-                        placeholder="https://example.com/article",
+                        placeholder="https://en.wikipedia.org/wiki/Markdown",
                         lines=1,
                         max_lines=1,
                     )
                     gr.Markdown(
-                        "Paste any public web page URL. "
-                        "Private/internal addresses are blocked.  \n"
-                        f"**Limit:** {MAX_FILE_SIZE_MB} MB response"
+                        "Works best with **articles, docs, wikis, blog posts**.  \n"
+                        "Private/internal addresses are blocked. "
+                        f"Max {MAX_FILE_SIZE_MB} MB response."
                     )
                     convert_url_btn = gr.Button(
                         "Fetch & Convert", variant="primary", size="lg"
                     )
 
-                with gr.Tab("Plain Text"):
+                with gr.Tab("✏️ Plain Text"):
                     text_input = gr.Textbox(
                         label="Paste plain text",
-                        placeholder="Paste any unstructured text here.\n\nMDnator will detect headings, lists, code blocks and convert to organised Markdown.",
+                        placeholder="Meeting notes, emails, outlines — paste anything here and MDnator will structure it as Markdown with headings, lists and paragraphs.",
                         lines=12,
                         max_lines=40,
                     )
                     gr.Markdown(
-                        "Detects **headings** (ALL CAPS or Title Case), "
-                        "**lists** (-, *, •, 1.), "
-                        "**code blocks** (``` or 4-space indent), "
-                        "and **paragraphs** automatically."
+                        "Auto-detects: **headings** (ALL CAPS / Title Case) · "
+                        "**lists** (-, *, •, 1.) · "
+                        "**code** (``` or 4-space indent)"
                     )
                     convert_text_btn = gr.Button(
                         "Format as Markdown", variant="primary", size="lg"
                     )
 
+            gr.Markdown("---")
             with gr.Row():
-                clear_btn = gr.Button("Clear all", variant="secondary", size="sm")
-            download_file = gr.File(
-                label="Download .md",
-                visible=False,
-                interactive=False,
-            )
+                clear_btn = gr.Button(
+                    "🗑 Clear", variant="secondary", size="lg", scale=1
+                )
+                download_file = gr.File(
+                    label="Download .md",
+                    visible=False,
+                    interactive=False,
+                    scale=2,
+                )
 
         with gr.Column(scale=2):
             with gr.Tabs():
                 with gr.Tab("Source"):
                     output_text = gr.Textbox(
-                        label="Markdown",
+                        label="Markdown output",
                         lines=25,
                         interactive=False,
                         buttons=["copy"],
-                        placeholder="Your converted Markdown will appear here...",
+                        placeholder="Your Markdown will appear here after conversion...",
                     )
                 with gr.Tab("Preview"):
                     output_preview = gr.Markdown(
