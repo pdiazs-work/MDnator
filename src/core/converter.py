@@ -10,6 +10,7 @@ from src.utils.logger import get_logger
 _logger = get_logger(__name__)
 
 _TEMP_DIR = Path(tempfile.gettempdir()).resolve()
+_TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 
 
 class DocumentConverter:
@@ -22,18 +23,15 @@ class DocumentConverter:
         """Convert the file at file_path to a Markdown string."""
         start = time.monotonic()
 
-        resolved = Path(os.path.abspath(file_path)).resolve()
-        filename = resolved.name
-
-        # Verify the file is in an expected directory (temp or its subdirs)
-        try:
-            resolved.relative_to(_TEMP_DIR)
-        except ValueError:
+        real = os.path.realpath(os.path.abspath(file_path))
+        if not real.startswith(_TEMP_DIR_STR):
             raise RuntimeError("File path is outside the expected upload directory.")
+        resolved = Path(real)
+        filename = resolved.name
 
         try:
             size = resolved.stat().st_size
-            result = self._md.convert(str(resolved))
+            result = self._md.convert(real)
             text = result.text_content or ""
         except FileNotFoundError:
             _logger.error("File not found | file=%s", filename)
