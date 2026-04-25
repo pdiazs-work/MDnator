@@ -1,4 +1,9 @@
-"""Audio file → Markdown transcript via OpenAI Whisper API."""
+"""Audio file → Markdown transcript.
+
+Two backends:
+- Free (default): faster-whisper running locally on CPU (model: tiny)
+- Premium: OpenAI Whisper API (requires api_key)
+"""
 
 import os
 import tempfile
@@ -13,11 +18,10 @@ _TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 
 AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4"})
 
-_MAX_AUDIO_MB = 25  # OpenAI Whisper API hard limit is 25 MB
+_MAX_AUDIO_MB = 25
 
 
 def _safe_audio_path(file_path: str) -> Path | None:
-    """Resolve and verify the path is inside the system temp directory."""
     try:
         real = os.path.realpath(os.path.abspath(file_path))
         if not real.startswith(_TEMP_DIR_STR):
@@ -43,17 +47,68 @@ def validate_audio_file(file_path: str) -> tuple[bool, str]:
     if size_mb > _MAX_AUDIO_MB:
         return (
             False,
-            f"Audio file ({size_mb:.1f} MB) exceeds the {_MAX_AUDIO_MB} MB limit (OpenAI Whisper API).",
+            f"Audio file ({size_mb:.1f} MB) exceeds the {_MAX_AUDIO_MB} MB limit.",
         )
     return True, ""
 
 
-def transcribe_audio(file_path: str, api_key: str) -> str:
-    """Transcribe audio file using OpenAI Whisper API.
+def _build_markdown(
+    filename: str, text: str, language: str | None, duration: float | None
+) -> str:
+    lines = [f"# Transcript — {filename}", ""]
+    if language:
+        lines.append(f"**Detected language:** {language}")
+    if duration:
+        mins, secs = divmod(int(duration), 60)
+        lines.append(f"**Duration:** {mins}m {secs:02d}s")
+    if language or duration:
+        lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append(text.strip())
+    return "\n".join(lines)
 
-    Returns a Markdown-formatted transcript.
-    Raises RuntimeError on any failure.
-    """
+
+def _transcribe_free(file_path: str) -> str:
+    """Transcribe using faster-whisper (tiny model, CPU, no API key needed)."""
+    try:
+        from faster_whisper import WhisperModel  # noqa: PLC0415
+    except ImportError:
+        raise RuntimeError(
+            "faster-whisper is not installed. Add 'faster-whisper' to requirements.txt."
+        )
+
+    real = os.path.realpath(os.path.abspath(file_path))
+    if not real.startswith(_TEMP_DIR_STR):
+        raise RuntimeError("Invalid audio file path.")
+    filename = Path(real).name
+
+    _logger.info("Free transcription start | file=%s", filename)
+    try:
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segments, info = model.transcribe(real, beam_size=1)
+        text = " ".join(seg.text.strip() for seg in segments)
+        language = info.language
+        duration = info.duration
+    except Exception as exc:
+        _logger.warning(
+            "Free transcription failed | file=%s | error=%s",
+            filename,
+            type(exc).__name__,
+        )
+        raise RuntimeError(f"Transcription failed: {exc}") from exc
+
+    if not text.strip():
+        raise RuntimeError("The audio file contains no recognisable speech.")
+
+    _logger.info(
+        "Free transcription complete | file=%s | chars=%d", filename, len(text)
+    )
+    return _build_markdown(filename, text, language, duration)
+
+
+def _transcribe_openai(file_path: str, api_key: str) -> str:
+    """Transcribe using OpenAI Whisper API."""
     try:
         from openai import OpenAI  # noqa: PLC0415
     except ImportError:
@@ -64,10 +119,9 @@ def transcribe_audio(file_path: str, api_key: str) -> str:
     real = os.path.realpath(os.path.abspath(file_path))
     if not real.startswith(_TEMP_DIR_STR):
         raise RuntimeError("Invalid audio file path.")
-    resolved = Path(real)
-    filename = resolved.name
+    filename = Path(real).name
 
-    _logger.info("Audio transcription start | file=%s", filename)
+    _logger.info("OpenAI transcription start | file=%s", filename)
     try:
         client = OpenAI(api_key=api_key.strip())
         with open(real, "rb") as audio_file:
@@ -78,7 +132,9 @@ def transcribe_audio(file_path: str, api_key: str) -> str:
             )
     except Exception as exc:
         _logger.warning(
-            "Transcription failed | file=%s | error=%s", filename, type(exc).__name__
+            "OpenAI transcription failed | file=%s | error=%s",
+            filename,
+            type(exc).__name__,
         )
         error_str = str(exc)
         if "401" in error_str or "Incorrect API key" in error_str:
@@ -96,17 +152,14 @@ def transcribe_audio(file_path: str, api_key: str) -> str:
     if not text.strip():
         raise RuntimeError("The audio file contains no recognisable speech.")
 
-    lines = [f"# Transcript — {filename}", ""]
-    if language:
-        lines.append(f"**Detected language:** {language}")
-    if duration:
-        mins, secs = divmod(int(duration), 60)
-        lines.append(f"**Duration:** {mins}m {secs:02d}s")
-    if language or duration:
-        lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append(text.strip())
+    _logger.info(
+        "OpenAI transcription complete | file=%s | chars=%d", filename, len(text)
+    )
+    return _build_markdown(filename, text, language, duration)
 
-    _logger.info("Transcription complete | file=%s | chars=%d", filename, len(text))
-    return "\n".join(lines)
+
+def transcribe_audio(file_path: str, api_key: str = "") -> str:
+    """Transcribe audio. Uses OpenAI API if api_key provided, otherwise faster-whisper."""
+    if api_key and api_key.strip():
+        return _transcribe_openai(file_path, api_key)
+    return _transcribe_free(file_path)
