@@ -1,8 +1,11 @@
 """Audio file → Markdown transcript.
 
-Two backends:
-- Free (default): faster-whisper running locally on CPU (model: tiny)
-- Premium: OpenAI Whisper API (requires api_key)
+Three backends (selected by `provider`):
+- "free"   : faster-whisper locally on CPU (model: tiny) — no API key needed
+- "openai" : OpenAI Whisper API (whisper-1) — requires user's OpenAI key
+- "gemini" : Google Gemini 1.5 Flash audio understanding — requires user's Gemini key
+
+API keys are used only for the duration of the request and are never logged or stored.
 """
 
 import os
@@ -19,6 +22,24 @@ _TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4"})
 
 _MAX_AUDIO_MB = 100
+
+_GEMINI_MIME = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".webm": "audio/webm",
+    ".mp4": "audio/mp4",
+}
+
+_GEMINI_PROMPT = (
+    "You are an expert transcriptionist. Listen to the audio and return ONLY the "
+    "verbatim transcript, formatted as clean Markdown. Use headings if the speaker "
+    "clearly changes topic; use bullet lists if items are enumerated. Preserve the "
+    "speaker's original tone and idiomatic expressions. Do NOT add introductions, "
+    "summaries, or any text outside the transcript itself."
+)
 
 
 def _safe_audio_path(file_path: str) -> Path | None:
@@ -86,13 +107,12 @@ def _transcribe_free(file_path: str) -> str:
     _logger.info("Free transcription start | file=%s", filename)
     try:
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        # Detect language first so the decoder uses the right token
-        detected_language, _ = model.detect_language(real)
         segments, info = model.transcribe(
             real,
-            language=detected_language,
             beam_size=5,
             vad_filter=True,
+            language_detection_segments=3,
+            language_detection_threshold=0.7,
         )
         text = " ".join(seg.text.strip() for seg in segments)
         language = info.language
@@ -115,7 +135,7 @@ def _transcribe_free(file_path: str) -> str:
 
 
 def _transcribe_openai(file_path: str, api_key: str) -> str:
-    """Transcribe using OpenAI Whisper API."""
+    """Transcribe using OpenAI Whisper API (whisper-1)."""
     try:
         from openai import OpenAI  # noqa: PLC0415
     except ImportError:
@@ -165,8 +185,77 @@ def _transcribe_openai(file_path: str, api_key: str) -> str:
     return _build_markdown(filename, text, language, duration)
 
 
-def transcribe_audio(file_path: str, api_key: str = "") -> str:
-    """Transcribe audio. Uses OpenAI API if api_key provided, otherwise faster-whisper."""
-    if api_key and api_key.strip():
+def _transcribe_gemini(file_path: str, api_key: str) -> str:
+    """Transcribe using Google Gemini 1.5 Flash multimodal audio understanding."""
+    try:
+        import google.generativeai as genai  # noqa: PLC0415
+    except ImportError:
+        raise RuntimeError(
+            "google-generativeai is not installed. Add 'google-generativeai' to requirements.txt."
+        )
+
+    real = os.path.realpath(os.path.abspath(file_path))
+    if not real.startswith(_TEMP_DIR_STR):
+        raise RuntimeError("Invalid audio file path.")
+    resolved = Path(real)
+    filename = resolved.name
+    mime = _GEMINI_MIME.get(resolved.suffix.lower(), "audio/mpeg")
+
+    _logger.info("Gemini transcription start | file=%s", filename)
+    try:
+        genai.configure(api_key=api_key.strip())
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        with open(real, "rb") as f:
+            audio_bytes = f.read()
+        response = model.generate_content(
+            [
+                {"mime_type": mime, "data": audio_bytes},
+                _GEMINI_PROMPT,
+            ]
+        )
+        text = response.text or ""
+    except Exception as exc:
+        _logger.warning(
+            "Gemini transcription failed | file=%s | error=%s",
+            filename,
+            type(exc).__name__,
+        )
+        error_str = str(exc)
+        if "API_KEY_INVALID" in error_str or "400" in error_str:
+            raise RuntimeError(
+                "Invalid Gemini API key. Check your key at aistudio.google.com."
+            )
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            raise RuntimeError(
+                "Gemini rate limit reached. Please wait a moment and try again."
+            )
+        raise RuntimeError(f"Transcription failed: {exc}") from exc
+
+    if not text.strip():
+        raise RuntimeError("The audio file contains no recognisable speech.")
+
+    _logger.info(
+        "Gemini transcription complete | file=%s | chars=%d", filename, len(text)
+    )
+    return _build_markdown(filename, text, None, None)
+
+
+def transcribe_audio(file_path: str, api_key: str = "", provider: str = "free") -> str:
+    """Transcribe audio file to Markdown.
+
+    provider: "free" (local faster-whisper), "openai" (Whisper API), "gemini" (Gemini 1.5 Flash)
+    API keys are used only in-memory for the duration of this call and are never logged.
+    """
+    if provider == "openai":
+        if not api_key or not api_key.strip():
+            raise RuntimeError(
+                "An OpenAI API key is required for OpenAI transcription."
+            )
         return _transcribe_openai(file_path, api_key)
+    if provider == "gemini":
+        if not api_key or not api_key.strip():
+            raise RuntimeError(
+                "A Gemini API key is required. Get one free at aistudio.google.com."
+            )
+        return _transcribe_gemini(file_path, api_key)
     return _transcribe_free(file_path)
