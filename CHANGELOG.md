@@ -16,6 +16,17 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-04-25
+
+### Fixed
+- YouTube tab was broken on Hugging Face Spaces: `youtube-transcript-api` was missing from `requirements.txt`
+- Updated `youtube_fetcher.py` for `youtube-transcript-api` v1.2.x dataclass API (snippets now have `.start`/`.text` attributes)
+
+### Changed
+- YouTube tab marked as **Beta** with warning about subtitle availability and potential YouTube blocking
+- Audio size limit raised from 25 MB to 100 MB (25 MB was an OpenAI API constraint; local model has no such limit)
+- Free transcription improved: language detection pass before transcription, `beam_size=5` (was 1), `vad_filter=True`
+
 ## [1.4.0] — 2026-04-25
 
 ### Added
