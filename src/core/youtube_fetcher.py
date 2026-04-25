@@ -59,32 +59,27 @@ def fetch_youtube(url: str) -> str:
     _logger.info("YouTube fetch | video_id=%s", video_id)
 
     try:
-        # v1.x API uses instance method
         api = YouTubeTranscriptApi()
         transcript_list = api.list(video_id)
-        # Prefer manually created transcripts over auto-generated
-        transcript = transcript_list.find_transcript(
-            ["en", "es", "fr", "de", "pt", "zh", "ja", "ar", "ru", "it"]
-        )
-        snippets = list(transcript.fetch())
-    except Exception:
-        # Fallback: try any available transcript
         try:
-            api = YouTubeTranscriptApi()
-            snippets_raw = api.fetch(video_id)
-            snippets = list(snippets_raw)
-        except Exception as exc:
-            _logger.warning(
-                "YouTube transcript failed | video_id=%s | error=%s",
-                video_id,
-                type(exc).__name__,
+            transcript = transcript_list.find_transcript(
+                ["en", "es", "fr", "de", "pt", "zh", "ja", "ar", "ru", "it"]
             )
-            raise RuntimeError(
-                f"Could not retrieve transcript for this video.\n"
-                f"Possible reasons: video has no subtitles, subtitles are disabled, "
-                f"or YouTube is temporarily blocking requests.\n"
-                f"Video URL: {canonical}"
-            ) from exc
+        except Exception:
+            transcript = next(iter(transcript_list))
+        snippets = list(transcript.fetch())
+    except Exception as exc:
+        _logger.warning(
+            "YouTube transcript failed | video_id=%s | error=%s",
+            video_id,
+            type(exc).__name__,
+        )
+        raise RuntimeError(
+            f"Could not retrieve transcript for this video.\n"
+            f"Possible reasons: video has no subtitles, subtitles are disabled, "
+            f"or YouTube is temporarily blocking requests.\n"
+            f"Video URL: {canonical}"
+        ) from exc
 
     if not snippets:
         raise RuntimeError("This video has no available transcript.")
@@ -106,17 +101,8 @@ def fetch_youtube(url: str) -> str:
     para_start = 0.0
 
     for snippet in snippets:
-        start = getattr(
-            snippet,
-            "start",
-            snippet.get("start", 0) if isinstance(snippet, dict) else 0,
-        )
-        text = getattr(
-            snippet,
-            "text",
-            snippet.get("text", "") if isinstance(snippet, dict) else str(snippet),
-        )
-        text = text.strip().replace("\n", " ")
+        start = snippet.start
+        text = snippet.text.strip().replace("\n", " ")
         if not text:
             continue
 
