@@ -33,6 +33,7 @@ _converter = DocumentConverter()
 _LANG_KEYS = list(LANGUAGES.keys())
 _LANG_DISPLAY = list(LANGUAGES.values())
 _DEFAULT_LANG = "en"
+_AUDIO_PROVIDERS = ["free", "openai", "gemini"]
 
 
 def _lang_key(display: str) -> str:
@@ -212,6 +213,7 @@ def process_youtube(url: str, lang_display: str, progress: gr.Progress = gr.Prog
 
 def process_audio(
     file_path: str | None,
+    provider_label: str,
     api_key: str,
     lang_display: str,
     progress: gr.Progress = gr.Progress(),
@@ -226,16 +228,24 @@ def process_audio(
             raise gr.Error(t(lang, "err_no_audio"))
         raise gr.Error(msg)
 
-    use_api = bool(api_key and api_key.strip())
-    desc = (
-        "Uploading to Whisper API…"
-        if use_api
-        else "Transcribing with local model (may take a while)…"
-    )
-    progress(0.2, desc=desc)
+    # Map display label back to internal provider key
+    provider = "free"
+    for key in _AUDIO_PROVIDERS:
+        if t("en", f"audio_provider_{key}") == provider_label or key in provider_label:
+            provider = key
+            break
+
+    _descs = {
+        "openai": "Uploading to OpenAI Whisper…",
+        "gemini": "Uploading to Gemini 1.5 Flash…",
+        "free": "Transcribing with local model (may take a while)…",
+    }
+    progress(0.2, desc=_descs.get(provider, _descs["free"]))
     start = time.monotonic()
     try:
-        markdown = transcribe_audio(file_path, api_key.strip() if use_api else "")
+        markdown = transcribe_audio(
+            file_path, api_key.strip() if api_key else "", provider
+        )
     except RuntimeError as exc:
         raise gr.Error(str(exc))
 
@@ -266,6 +276,15 @@ def update_ui(lang_display: str):
         gr.update(value=t(lang, "youtube_btn")),
         gr.update(label=t(lang, "audio_label")),
         gr.update(value=t(lang, "audio_hint", max_mb=_MAX_AUDIO_MB)),
+        gr.update(
+            label=t(lang, "audio_provider_label"),
+            choices=[
+                t(lang, "audio_provider_free"),
+                t(lang, "audio_provider_openai"),
+                t(lang, "audio_provider_gemini"),
+            ],
+            value=t(lang, "audio_provider_free"),
+        ),
         gr.update(label=t(lang, "audio_apikey_accordion")),
         gr.update(
             label=t(lang, "audio_apikey_label"),
@@ -387,8 +406,19 @@ with gr.Blocks(title=APP_TITLE) as demo:
                     audio_hint = gr.Markdown(
                         value=t(_DEFAULT_LANG, "audio_hint", max_mb=_MAX_AUDIO_MB)
                     )
+                    audio_provider_radio = gr.Radio(
+                        choices=[
+                            t(_DEFAULT_LANG, "audio_provider_free"),
+                            t(_DEFAULT_LANG, "audio_provider_openai"),
+                            t(_DEFAULT_LANG, "audio_provider_gemini"),
+                        ],
+                        value=t(_DEFAULT_LANG, "audio_provider_free"),
+                        label=t(_DEFAULT_LANG, "audio_provider_label"),
+                    )
                     with gr.Accordion(
-                        t(_DEFAULT_LANG, "audio_apikey_accordion"), open=False
+                        t(_DEFAULT_LANG, "audio_apikey_accordion"),
+                        open=False,
+                        visible=False,
                     ) as audio_apikey_accordion:
                         audio_apikey_input = gr.Textbox(
                             label=t(_DEFAULT_LANG, "audio_apikey_label"),
@@ -455,6 +485,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
         convert_youtube_btn,
         audio_input,
         audio_hint,
+        audio_provider_radio,
         audio_apikey_accordion,
         audio_apikey_input,
         convert_audio_btn,
@@ -464,6 +495,31 @@ with gr.Blocks(title=APP_TITLE) as demo:
         stats_output,
         app_desc,
     ]
+
+    def _on_provider_change(provider_label: str, lang_display: str):
+        lang = _lang_key(lang_display)
+        is_free = provider_label == t(lang, "audio_provider_free")
+        is_gemini = provider_label == t(lang, "audio_provider_gemini")
+        key_label = (
+            t(lang, "audio_apikey_label_gemini")
+            if is_gemini
+            else t(lang, "audio_apikey_label_openai")
+        )
+        key_placeholder = (
+            t(lang, "audio_apikey_placeholder_gemini")
+            if is_gemini
+            else t(lang, "audio_apikey_placeholder_openai")
+        )
+        return (
+            gr.update(visible=not is_free, open=not is_free),
+            gr.update(label=key_label, placeholder=key_placeholder, value=""),
+        )
+
+    audio_provider_radio.change(
+        fn=_on_provider_change,
+        inputs=[audio_provider_radio, lang_selector],
+        outputs=[audio_apikey_accordion, audio_apikey_input],
+    )
 
     convert_files_btn.click(
         fn=process_files, inputs=[file_input, lang_selector], outputs=_outputs
@@ -479,7 +535,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
     )
     convert_audio_btn.click(
         fn=process_audio,
-        inputs=[audio_input, audio_apikey_input, lang_selector],
+        inputs=[audio_input, audio_provider_radio, audio_apikey_input, lang_selector],
         outputs=_outputs,
     )
     clear_btn.click(
