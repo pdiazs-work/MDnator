@@ -220,19 +220,22 @@ def process_audio(
     if not file_path:
         raise gr.Error(t(lang, "err_no_audio"))
 
-    if not api_key or not api_key.strip():
-        raise gr.Error(t(lang, "err_no_apikey"))
-
     ok, msg = validate_audio_file(file_path)
     if not ok:
         if msg == "no_audio":
             raise gr.Error(t(lang, "err_no_audio"))
         raise gr.Error(msg)
 
-    progress(0.2, desc="Uploading to Whisper API…")
+    use_api = bool(api_key and api_key.strip())
+    desc = (
+        "Uploading to Whisper API…"
+        if use_api
+        else "Transcribing with local model (may take a while)…"
+    )
+    progress(0.2, desc=desc)
     start = time.monotonic()
     try:
-        markdown = transcribe_audio(file_path, api_key.strip())
+        markdown = transcribe_audio(file_path, api_key.strip() if use_api else "")
     except RuntimeError as exc:
         raise gr.Error(str(exc))
 
@@ -263,6 +266,7 @@ def update_ui(lang_display: str):
         gr.update(value=t(lang, "youtube_btn")),
         gr.update(label=t(lang, "audio_label")),
         gr.update(value=t(lang, "audio_hint", max_mb=_MAX_AUDIO_MB)),
+        gr.update(label=t(lang, "audio_apikey_accordion")),
         gr.update(
             label=t(lang, "audio_apikey_label"),
             placeholder=t(lang, "audio_apikey_placeholder"),
@@ -281,13 +285,13 @@ def update_ui(lang_display: str):
 def clear(lang_display: str):
     lang = _lang_key(lang_display)
     return (
-        gr.update(value=None),
+        gr.update(value=[]),
         gr.update(value=""),
         gr.update(value=""),
-        gr.update(value=None),
-        gr.update(value=None),
+        gr.update(value=""),
+        gr.update(value=[]),
         gr.update(value=None, visible=False),
-        t(lang, "preview_placeholder"),
+        gr.update(value=t(lang, "preview_placeholder")),
         gr.update(value="", visible=False),
         gr.update(value=""),
     )
@@ -383,13 +387,16 @@ with gr.Blocks(title=APP_TITLE) as demo:
                     audio_hint = gr.Markdown(
                         value=t(_DEFAULT_LANG, "audio_hint", max_mb=_MAX_AUDIO_MB)
                     )
-                    audio_apikey_input = gr.Textbox(
-                        label=t(_DEFAULT_LANG, "audio_apikey_label"),
-                        placeholder=t(_DEFAULT_LANG, "audio_apikey_placeholder"),
-                        type="password",
-                        lines=1,
-                        max_lines=1,
-                    )
+                    with gr.Accordion(
+                        t(_DEFAULT_LANG, "audio_apikey_accordion"), open=False
+                    ) as audio_apikey_accordion:
+                        audio_apikey_input = gr.Textbox(
+                            label=t(_DEFAULT_LANG, "audio_apikey_label"),
+                            placeholder=t(_DEFAULT_LANG, "audio_apikey_placeholder"),
+                            type="password",
+                            lines=1,
+                            max_lines=1,
+                        )
                     convert_audio_btn = gr.Button(
                         t(_DEFAULT_LANG, "audio_btn"), variant="primary", size="lg"
                     )
@@ -448,6 +455,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
         convert_youtube_btn,
         audio_input,
         audio_hint,
+        audio_apikey_accordion,
         audio_apikey_input,
         convert_audio_btn,
         clear_btn,
