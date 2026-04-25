@@ -18,7 +18,7 @@ _TEMP_DIR_STR = str(_TEMP_DIR) + os.sep
 
 AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4"})
 
-_MAX_AUDIO_MB = 25
+_MAX_AUDIO_MB = 100
 
 
 def _safe_audio_path(file_path: str) -> Path | None:
@@ -86,7 +86,14 @@ def _transcribe_free(file_path: str) -> str:
     _logger.info("Free transcription start | file=%s", filename)
     try:
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments, info = model.transcribe(real, beam_size=1)
+        # Detect language first so the decoder uses the right token
+        detected_language, _ = model.detect_language(real)
+        segments, info = model.transcribe(
+            real,
+            language=detected_language,
+            beam_size=5,
+            vad_filter=True,
+        )
         text = " ".join(seg.text.strip() for seg in segments)
         language = info.language
         duration = info.duration
