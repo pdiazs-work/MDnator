@@ -16,6 +16,20 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-04-25
+
+### Added
+- Free audio transcription via `faster-whisper` (tiny model, CPU) — no API key required
+- OpenAI Whisper API remains available as optional premium backend (faster, higher quality)
+- OpenAI API key field collapsed into an accordion by default to reduce visual clutter
+
+### Fixed
+- Clear button now correctly resets file inputs using `[]` instead of `None` (Gradio 6 compatibility)
+
+### Changed
+- `audio_hint` text updated to communicate free-tier availability across all 10 languages
+- Added `audio_apikey_accordion` i18n key in all 10 supported languages
+
 ## [1.3.1] — 2026-04-24
 
 ### Fixed
