@@ -16,6 +16,18 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-04-25
+
+### Added
+- Gemini 1.5 Flash audio backend: natively understands audio context, handles accents and idioms far better than Whisper tiny
+- Provider Radio selector in Audio tab: Free (local) / OpenAI Whisper / Gemini 1.5 Flash
+- API key field appears only when a paid provider is selected; label and placeholder adapt; field is cleared on switch
+- BYOK (Bring Your Own Key): keys used only in-memory for the duration of the request, never logged or stored
+
+### Fixed
+- Free transcription crash: `detect_language()` was called with a file path (string) but expects a numpy array; replaced with `language_detection_segments=3` + `language_detection_threshold=0.7` params inside `transcribe()`
+- YouTube Beta warning now shown in all 10 languages (was missing in 8)
+
 ## [1.4.1] — 2026-04-25
 
 ### Fixed
