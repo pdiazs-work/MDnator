@@ -3,4 +3,4 @@ gradio==6.12.0
 pytest==9.0.3
 pre-commit==4.5.1
 detect-secrets==1.5.0
-ruff==0.15.11
+ruff==0.15.12
