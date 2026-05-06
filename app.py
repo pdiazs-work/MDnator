@@ -298,6 +298,7 @@ def update_ui(lang_display: str):
         ),
         gr.update(label=t(lang, "stats_label")),
         gr.update(value=t(lang, "app_description")),
+        gr.update(label=t(lang, "language_label")),
     )
 
 
@@ -333,7 +334,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
             )
 
     with gr.Row():
-        with gr.Column(scale=1):
+        with gr.Column(scale=2):
             with gr.Tabs():
                 with gr.Tab(t(_DEFAULT_LANG, "tab_documents")):
                     file_input = gr.File(
@@ -494,6 +495,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
         output_text,
         stats_output,
         app_desc,
+        lang_selector,
     ]
 
     def _on_provider_change(provider_label: str, lang_display: str):

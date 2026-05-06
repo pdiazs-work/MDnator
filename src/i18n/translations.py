@@ -72,7 +72,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "An OpenAI API key is required for audio transcription.",
         "err_no_content": "No content could be extracted.",
         "err_no_results": "No files converted successfully.",
-        "language_label": "Language",
+        "language_label": "🌐 Language",
     },
     "es": {
         "app_description": "Convierte **documentos**, **páginas web** o **texto plano** a Markdown limpio al instante. Sin registro, sin almacenamiento de datos.",
@@ -127,7 +127,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Se requiere una API key de OpenAI para transcribir audio.",
         "err_no_content": "No se pudo extraer contenido.",
         "err_no_results": "Ningún archivo se convirtió correctamente.",
-        "language_label": "Idioma",
+        "language_label": "🌐 Idioma",
     },
     "fr": {
         "app_description": "Convertissez **documents**, **pages web** ou **texte brut** en Markdown propre instantanément. Sans inscription, sans stockage de données.",
@@ -182,7 +182,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Une clé API OpenAI est requise pour la transcription audio.",
         "err_no_content": "Aucun contenu n'a pu être extrait.",
         "err_no_results": "Aucun fichier n'a été converti avec succès.",
-        "language_label": "Langue",
+        "language_label": "🌐 Langue",
     },
     "de": {
         "app_description": "Konvertiere **Dokumente**, **Webseiten** oder **Klartext** sofort in sauberes Markdown. Keine Anmeldung, keine Datenspeicherung.",
@@ -237,7 +237,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Ein OpenAI API-Schlüssel ist für die Audio-Transkription erforderlich.",
         "err_no_content": "Es konnte kein Inhalt extrahiert werden.",
         "err_no_results": "Keine Dateien erfolgreich konvertiert.",
-        "language_label": "Sprache",
+        "language_label": "🌐 Sprache",
     },
     "pt": {
         "app_description": "Converta **documentos**, **páginas web** ou **texto simples** em Markdown limpo instantaneamente. Sem cadastro, sem armazenamento de dados.",
@@ -292,7 +292,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Uma chave API OpenAI é necessária para transcrição de áudio.",
         "err_no_content": "Nenhum conteúdo pôde ser extraído.",
         "err_no_results": "Nenhum arquivo convertido com sucesso.",
-        "language_label": "Idioma",
+        "language_label": "🌐 Idioma",
     },
     "zh": {
         "app_description": "即时将**文档**、**网页**或**纯文本**转换为简洁的 Markdown。无需注册，不存储数据。",
@@ -347,7 +347,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "音频转录需要 OpenAI API 密钥。",
         "err_no_content": "无法提取内容。",
         "err_no_results": "没有文件转换成功。",
-        "language_label": "语言",
+        "language_label": "🌐 语言",
     },
     "ja": {
         "app_description": "**ドキュメント**、**ウェブページ**、または**プレーンテキスト**を瞬時にきれいなMarkdownに変換します。登録不要、データ保存なし。",
@@ -402,7 +402,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "音声文字起こしにはOpenAI APIキーが必要です。",
         "err_no_content": "コンテンツを抽出できませんでした。",
         "err_no_results": "変換に成功したファイルがありません。",
-        "language_label": "言語",
+        "language_label": "🌐 言語",
     },
     "ar": {
         "app_description": "حوّل **المستندات** أو **صفحات الويب** أو **النص العادي** إلى Markdown نظيف فوراً. بدون تسجيل، بدون تخزين بيانات.",
@@ -457,7 +457,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "مفتاح API لـ OpenAI مطلوب لنسخ الصوت.",
         "err_no_content": "تعذّر استخراج أي محتوى.",
         "err_no_results": "لم يتم تحويل أي ملف بنجاح.",
-        "language_label": "اللغة",
+        "language_label": "🌐 اللغة",
     },
     "ru": {
         "app_description": "Мгновенно конвертируйте **документы**, **веб-страницы** или **обычный текст** в чистый Markdown. Без регистрации, без хранения данных.",
@@ -512,7 +512,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Для транскрипции аудио требуется API-ключ OpenAI.",
         "err_no_content": "Не удалось извлечь содержимое.",
         "err_no_results": "Ни один файл не был успешно конвертирован.",
-        "language_label": "Язык",
+        "language_label": "🌐 Язык",
     },
     "it": {
         "app_description": "Converti **documenti**, **pagine web** o **testo semplice** in Markdown pulito istantaneamente. Senza registrazione, senza archiviazione dei dati.",
@@ -567,7 +567,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_no_apikey": "Una chiave API OpenAI è richiesta per la trascrizione audio.",
         "err_no_content": "Nessun contenuto estratto.",
         "err_no_results": "Nessun file convertito con successo.",
-        "language_label": "Lingua",
+        "language_label": "🌐 Lingua",
     },
 }
 
