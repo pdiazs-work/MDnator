@@ -1,4 +1,4 @@
-from src.config.settings import MAX_FILE_SIZE_BYTES
+from src.config.settings import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from src.core.validators import validate_extension, validate_file, validate_size
 
 
@@ -24,7 +24,7 @@ def test_size_exceeds_limit(tmp_path):
     big.write_bytes(b"x" * (MAX_FILE_SIZE_BYTES + 1))
     ok, msg = validate_size(str(big))
     assert not ok
-    assert "20 MB" in msg
+    assert f"{MAX_FILE_SIZE_MB} MB" in msg
 
 
 def test_validate_file_missing():

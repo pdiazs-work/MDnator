@@ -16,6 +16,12 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-05-06
+
+### Changed
+- File size limit raised from 20 MB to 200 MB, enabling large PDFs (e.g. 88 MB books) to be converted to Markdown
+- Error message for oversized files now reads the limit from the config constant instead of a hardcoded string
+
 ## [1.5.0] — 2026-04-25
 
 ### Added
