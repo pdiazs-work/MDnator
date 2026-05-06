@@ -16,6 +16,13 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-05-06
+
+### Changed
+- Left input panel widened (scale 1→2 vs output panel scale 2→2) to make better use of horizontal space
+- Language selector now shows 🌐 icon prefix on its label across all 10 languages
+- Language selector label now updates dynamically when the language is changed (was static after page load)
+
 ## [1.6.0] — 2026-05-06
 
 ### Changed
