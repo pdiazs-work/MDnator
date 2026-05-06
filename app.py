@@ -23,7 +23,11 @@ from src.core.converter import DocumentConverter
 from src.core.text_formatter import format_plain_text
 from src.core.url_fetcher import fetch_url, validate_url
 from src.core.validators import validate_file
-from src.core.youtube_fetcher import fetch_youtube, validate_youtube_url
+from src.core.youtube_fetcher import (
+    fetch_youtube,
+    format_transcript_paste,
+    validate_youtube_url,
+)
 from src.i18n.translations import LANGUAGES, t
 from src.utils.logger import get_logger
 
@@ -222,7 +226,7 @@ def process_youtube_paste(raw_text: str, lang_display: str):
         raise gr.Error(t(lang, "err_no_text"))
 
     start = time.monotonic()
-    markdown = format_plain_text(raw_text)
+    markdown = format_transcript_paste(raw_text)
 
     if not markdown.strip():
         raise gr.Error(t(lang, "err_no_content"))

@@ -16,6 +16,14 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.8.1] — 2026-05-06
+
+### Fixed
+- Paste transcript tab now uses a smart transcript formatter instead of the generic plain-text formatter
+- Detects timestamps (MM:SS or HH:MM:SS at line start or in brackets) and groups them into ~60s paragraphs with bold **[M:SS]** markers
+- Without timestamps: splits into ~150-word paragraphs at sentence boundaries (never mid-sentence)
+- Detects speaker tags like `- [Speaker]` and bolds them
+
 ## [1.8.0] — 2026-05-06
 
 ### Added

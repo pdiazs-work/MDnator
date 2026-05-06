@@ -272,6 +272,115 @@ def _snippets_to_markdown(snippets: list[dict], canonical: str, video_id: str) -
 
 
 # ---------------------------------------------------------------------------
+# Paste-transcript formatter
+# ---------------------------------------------------------------------------
+
+_TS_WITH_BRACKETS = re.compile(r"^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)")
+_TS_PLAIN = re.compile(r"^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)")
+_SPEAKER_TAG = re.compile(r"^-\s*\[([^\]]+)\]\s*")
+
+
+def _ts_to_seconds(ts: str) -> float:
+    parts = ts.split(":")
+    parts = [float(p) for p in parts]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+
+
+def _format_seconds(secs: float) -> str:
+    total = int(secs)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def format_transcript_paste(text: str) -> str:
+    """Format a pasted transcript as structured Markdown.
+
+    - If timestamps are detected (MM:SS or HH:MM:SS at line start or in [brackets]),
+      groups lines into ~60-second paragraphs with bold timestamp markers.
+    - Otherwise splits into ~150-word paragraphs at sentence boundaries.
+    - Detects speaker tags like "- [Speaker]" and bolds them.
+    """
+    lines = [ln.rstrip() for ln in text.strip().splitlines()]
+
+    # --- Try to parse timestamped lines ---
+    snippets: list[dict] = []
+    for line in lines:
+        if not line:
+            continue
+        m = _TS_WITH_BRACKETS.match(line) or _TS_PLAIN.match(line)
+        if m:
+            ts_str, body = m.group(1), m.group(2).strip()
+            if body:
+                snippets.append({"start": _ts_to_seconds(ts_str), "text": body})
+
+    if len(snippets) >= 3:
+        # Build grouped paragraphs (~60s each)
+        header = [
+            "# YouTube Transcript",
+            "",
+            "*Pasted transcript with timestamps.*",
+            "",
+            "---",
+            "",
+        ]
+        para_texts: list[str] = []
+        current: list[str] = []
+        para_start = snippets[0]["start"]
+
+        for snip in snippets:
+            if not current:
+                para_start = snip["start"]
+            current.append(snip["text"])
+            if snip["start"] - para_start >= 60:
+                para_texts.append(
+                    f"**[{_format_seconds(para_start)}]** {' '.join(current)}"
+                )
+                current = []
+
+        if current:
+            para_texts.append(
+                f"**[{_format_seconds(para_start)}]** {' '.join(current)}"
+            )
+
+        return "\n\n".join(header + para_texts)
+
+    # --- No timestamps: split into ~150-word paragraphs at sentence boundaries ---
+    # Flatten all lines into one string, then split on sentence-ending punctuation
+    full = " ".join(ln for ln in lines if ln)
+
+    # Handle speaker tags: bold them
+    full = _SPEAKER_TAG.sub(lambda m: f"**{m.group(1)}:** ", full)
+
+    words = full.split()
+    paragraphs: list[str] = []
+    chunk: list[str] = []
+
+    for word in words:
+        chunk.append(word)
+        if len(chunk) >= 150 and word.endswith((".", "?", "!", "…")):
+            paragraphs.append(" ".join(chunk))
+            chunk = []
+
+    if chunk:
+        paragraphs.append(" ".join(chunk))
+
+    header_lines = [
+        "# YouTube Transcript",
+        "",
+        "*Pasted transcript — no timestamps available.*",
+        "",
+        "---",
+        "",
+    ]
+    return "\n\n".join(header_lines + paragraphs)
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
