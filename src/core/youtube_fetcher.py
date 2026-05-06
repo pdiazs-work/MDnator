@@ -1,6 +1,16 @@
-"""YouTube URL → Markdown transcript via youtube-transcript-api."""
+"""YouTube URL → Markdown transcript.
 
+Three-layer extraction cascade:
+  1. yt-dlp  — most robust, handles auto-generated captions
+  2. youtube-transcript-api — fallback for cases yt-dlp can't reach
+  3. YouTube Data API v3 (BYOK) — official API, manual captions only
+"""
+
+import os
 import re
+import tempfile
+
+import requests
 
 from src.utils.logger import get_logger
 
@@ -12,6 +22,8 @@ _YT_PATTERNS = [
     r"(?:https?://)?(?:www\.)?youtube\.com/shorts/([\w-]{11})",
     r"(?:https?://)?(?:www\.)?youtube\.com/embed/([\w-]{11})",
 ]
+
+_LANG_PREF = ["en", "es", "fr", "de", "pt", "zh", "ja", "ar", "ru", "it"]
 
 
 def validate_youtube_url(url: str) -> tuple[bool, str]:
@@ -35,17 +47,245 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
-def fetch_youtube(url: str) -> str:
-    """Fetch YouTube transcript and return Markdown.
+# ---------------------------------------------------------------------------
+# Layer 1: yt-dlp
+# ---------------------------------------------------------------------------
 
-    Tries multiple transcript languages in order.
-    Raises RuntimeError on failure.
-    """
+
+def _fetch_via_ytdlp(video_id: str) -> list[dict]:
+    """Download subtitles via yt-dlp Python API. Returns [{start, text}, ...]."""
+    try:
+        import yt_dlp  # noqa: PLC0415
+    except ImportError:
+        raise RuntimeError("yt-dlp is not installed.")
+
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ydl_opts = {
+            "skip_download": True,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitlesformat": "json3",
+            "subtitleslangs": _LANG_PREF + ["all"],
+            "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
+            "quiet": True,
+            "no_warnings": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info(url, download=True)
+
+        # Find a downloaded subtitle file
+        sub_file = None
+        for lang in _LANG_PREF:
+            candidate = os.path.join(tmpdir, f"{video_id}.{lang}.json3")
+            if os.path.exists(candidate):
+                sub_file = candidate
+                break
+        if sub_file is None:
+            # Pick any .json3 file available
+            for fname in os.listdir(tmpdir):
+                if fname.endswith(".json3"):
+                    sub_file = os.path.join(tmpdir, fname)
+                    break
+
+        if sub_file is None:
+            raise RuntimeError("yt-dlp: no subtitle file found.")
+
+        import json  # noqa: PLC0415
+
+        with open(sub_file, encoding="utf-8") as f:
+            data = json.load(f)
+
+        snippets = []
+        for event in data.get("events", []):
+            start_ms = event.get("tStartMs", 0)
+            segs = event.get("segs", [])
+            text = "".join(s.get("utf8", "") for s in segs).strip()
+            text = text.replace("\n", " ").strip()
+            if text and text != "\n":
+                snippets.append({"start": start_ms / 1000.0, "text": text})
+
+        if not snippets:
+            raise RuntimeError("yt-dlp: subtitle file was empty.")
+
+        _logger.info(
+            "yt-dlp success | video_id=%s | snippets=%d", video_id, len(snippets)
+        )
+        return snippets
+
+
+# ---------------------------------------------------------------------------
+# Layer 2: youtube-transcript-api
+# ---------------------------------------------------------------------------
+
+
+def _fetch_via_transcript_api(video_id: str) -> list[dict]:
+    """Fetch via youtube-transcript-api. Returns [{start, text}, ...]."""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi  # noqa: PLC0415
     except ImportError:
         raise RuntimeError("youtube-transcript-api is not installed.")
 
+    api = YouTubeTranscriptApi()
+    transcript_list = api.list(video_id)
+    try:
+        transcript = transcript_list.find_transcript(_LANG_PREF)
+    except Exception:
+        transcript = next(iter(transcript_list))
+
+    raw = list(transcript.fetch())
+    snippets = [
+        {"start": s.start, "text": s.text.strip().replace("\n", " ")} for s in raw
+    ]
+    _logger.info(
+        "transcript-api success | video_id=%s | snippets=%d", video_id, len(snippets)
+    )
+    return snippets
+
+
+# ---------------------------------------------------------------------------
+# Layer 3: YouTube Data API v3 (BYOK, manual captions only)
+# ---------------------------------------------------------------------------
+
+
+def _fetch_via_youtube_api(video_id: str, api_key: str) -> list[dict]:
+    """Fetch via YouTube Data API v3. Returns [{start, text}, ...].
+
+    Only works for videos with manually uploaded captions.
+    Auto-generated captions are not accessible through this API.
+    """
+    base = "https://www.googleapis.com/youtube/v3"
+
+    # 1. List available caption tracks
+    resp = requests.get(
+        f"{base}/captions",
+        params={"videoId": video_id, "key": api_key, "part": "snippet"},
+        timeout=15,
+    )
+    if resp.status_code == 403:
+        raise RuntimeError(
+            "YouTube API key is invalid or lacks permission. "
+            "Make sure the YouTube Data API v3 is enabled in your Google Cloud project."
+        )
+    resp.raise_for_status()
+    tracks = resp.json().get("items", [])
+    if not tracks:
+        raise RuntimeError(
+            "No manually uploaded captions found for this video via YouTube Data API. "
+            "Auto-generated captions are not accessible through the official API."
+        )
+
+    # Pick the best track by language preference
+    chosen = None
+    for lang in _LANG_PREF:
+        for track in tracks:
+            if track["snippet"].get("language", "").startswith(lang):
+                chosen = track
+                break
+        if chosen:
+            break
+    if chosen is None:
+        chosen = tracks[0]
+
+    # 2. Download the caption track via timedtext endpoint
+    # (The captions.download endpoint requires OAuth for most tracks)
+    timed_resp = requests.get(
+        "https://www.youtube.com/api/timedtext",
+        params={
+            "v": video_id,
+            "lang": chosen["snippet"].get("language", "en"),
+            "fmt": "json3",
+            "key": api_key,
+        },
+        timeout=15,
+    )
+
+    if timed_resp.status_code != 200 or not timed_resp.text.strip():
+        raise RuntimeError(
+            "Could not download caption track via YouTube Data API. "
+            "The track may be restricted."
+        )
+
+    try:
+        data = timed_resp.json()
+    except Exception:
+        raise RuntimeError("YouTube Data API returned an unreadable caption format.")
+
+    snippets = []
+    for event in data.get("events", []):
+        start_ms = event.get("tStartMs", 0)
+        segs = event.get("segs", [])
+        text = "".join(s.get("utf8", "") for s in segs).strip().replace("\n", " ")
+        if text:
+            snippets.append({"start": start_ms / 1000.0, "text": text})
+
+    if not snippets:
+        raise RuntimeError("YouTube Data API: caption track was empty.")
+
+    _logger.info(
+        "YouTube API v3 success | video_id=%s | snippets=%d", video_id, len(snippets)
+    )
+    return snippets
+
+
+# ---------------------------------------------------------------------------
+# Markdown builder
+# ---------------------------------------------------------------------------
+
+
+def _snippets_to_markdown(snippets: list[dict], canonical: str, video_id: str) -> str:
+    """Convert snippet list to Markdown with ~60s paragraph grouping."""
+    lines = [
+        "# YouTube Transcript",
+        "",
+        f"**Source:** [{canonical}]({canonical})",
+        f"**Video ID:** `{video_id}`",
+        "",
+        "---",
+        "",
+    ]
+
+    para_texts: list[str] = []
+    current_para: list[str] = []
+    para_start = 0.0
+
+    for snippet in snippets:
+        start = snippet["start"]
+        text = snippet["text"]
+        if not text:
+            continue
+        if not current_para:
+            para_start = start
+        current_para.append(text)
+        if start - para_start >= 60:
+            mins, secs = divmod(int(para_start), 60)
+            para_texts.append(f"**[{mins}:{secs:02d}]** {' '.join(current_para)}")
+            current_para = []
+            para_start = start
+
+    if current_para:
+        mins, secs = divmod(int(para_start), 60)
+        para_texts.append(f"**[{mins}:{secs:02d}]** {' '.join(current_para)}")
+
+    lines.extend(para_texts)
+    return "\n\n".join(lines) if len(lines) > 7 else "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+
+def fetch_youtube(url: str, api_key: str = "") -> str:
+    """Fetch YouTube transcript and return Markdown.
+
+    Tries three extraction methods in order:
+      1. yt-dlp (most robust, handles auto-generated captions)
+      2. youtube-transcript-api (fallback)
+      3. YouTube Data API v3 (only if api_key provided; manual captions only)
+
+    Raises RuntimeError if all methods fail.
+    """
     url = url.strip()
     ok, err = validate_youtube_url(url)
     if not ok:
@@ -58,71 +298,46 @@ def fetch_youtube(url: str) -> str:
     canonical = f"https://www.youtube.com/watch?v={video_id}"
     _logger.info("YouTube fetch | video_id=%s", video_id)
 
+    snippets: list[dict] = []
+    errors: list[str] = []
+
+    # Layer 1: yt-dlp
     try:
-        api = YouTubeTranscriptApi()
-        transcript_list = api.list(video_id)
-        try:
-            transcript = transcript_list.find_transcript(
-                ["en", "es", "fr", "de", "pt", "zh", "ja", "ar", "ru", "it"]
-            )
-        except Exception:
-            transcript = next(iter(transcript_list))
-        snippets = list(transcript.fetch())
+        snippets = _fetch_via_ytdlp(video_id)
     except Exception as exc:
-        _logger.warning(
-            "YouTube transcript failed | video_id=%s | error=%s",
-            video_id,
-            type(exc).__name__,
-        )
-        raise RuntimeError(
-            f"Could not retrieve transcript for this video.\n"
-            f"Possible reasons: video has no subtitles, subtitles are disabled, "
-            f"or YouTube is temporarily blocking requests.\n"
-            f"Video URL: {canonical}"
-        ) from exc
+        _logger.warning("yt-dlp failed | video_id=%s | %s", video_id, exc)
+        errors.append(f"yt-dlp: {exc}")
+
+    # Layer 2: youtube-transcript-api
+    if not snippets:
+        try:
+            snippets = _fetch_via_transcript_api(video_id)
+        except Exception as exc:
+            _logger.warning("transcript-api failed | video_id=%s | %s", video_id, exc)
+            errors.append(f"transcript-api: {exc}")
+
+    # Layer 3: YouTube Data API v3 (BYOK)
+    if not snippets and api_key:
+        try:
+            snippets = _fetch_via_youtube_api(video_id, api_key.strip())
+        except Exception as exc:
+            _logger.warning("YouTube API v3 failed | video_id=%s | %s", video_id, exc)
+            errors.append(f"YouTube API v3: {exc}")
 
     if not snippets:
-        raise RuntimeError("This video has no available transcript.")
+        raise RuntimeError(
+            "Could not retrieve transcript for this video.\n"
+            "Tried: yt-dlp, youtube-transcript-api"
+            + (", YouTube Data API v3" if api_key else "")
+            + f".\nPossible reasons: video has no subtitles, subtitles are disabled, "
+            f"or YouTube is blocking requests from this server.\n"
+            f"Video URL: {canonical}\n\n"
+            f"Tip: Use the 'Paste transcript' tab to paste a transcript manually "
+            f"(e.g. from youtubetotranscript.com)."
+        )
 
-    # Build Markdown
-    lines = [
-        "# YouTube Transcript",
-        "",
-        f"**Source:** [{canonical}]({canonical})",
-        f"**Video ID:** `{video_id}`",
-        "",
-        "---",
-        "",
-    ]
-
-    # Group snippets into paragraphs (~60 seconds each)
-    para_texts: list[str] = []
-    current_para: list[str] = []
-    para_start = 0.0
-
-    for snippet in snippets:
-        start = snippet.start
-        text = snippet.text.strip().replace("\n", " ")
-        if not text:
-            continue
-
-        if not current_para:
-            para_start = start
-
-        current_para.append(text)
-
-        if start - para_start >= 60:
-            mins, secs = divmod(int(para_start), 60)
-            para_texts.append(f"**[{mins}:{secs:02d}]** {' '.join(current_para)}")
-            current_para = []
-            para_start = start
-
-    if current_para:
-        mins, secs = divmod(int(para_start), 60)
-        para_texts.append(f"**[{mins}:{secs:02d}]** {' '.join(current_para)}")
-
-    lines.extend(para_texts)
+    markdown = _snippets_to_markdown(snippets, canonical, video_id)
     _logger.info(
-        "YouTube transcript ok | video_id=%s | paragraphs=%d", video_id, len(para_texts)
+        "YouTube transcript ok | video_id=%s | snippets=%d", video_id, len(snippets)
     )
-    return "\n\n".join(lines) if len(lines) > 7 else "\n".join(lines)
+    return markdown

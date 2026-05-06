@@ -190,7 +190,12 @@ def process_text(raw_text: str, lang_display: str):
     return _emit(markdown, time.monotonic() - start, label="plain text")
 
 
-def process_youtube(url: str, lang_display: str, progress: gr.Progress = gr.Progress()):
+def process_youtube(
+    url: str,
+    api_key: str,
+    lang_display: str,
+    progress: gr.Progress = gr.Progress(),
+):
     lang = _lang_key(lang_display)
     url = url.strip()
     if not url:
@@ -203,11 +208,25 @@ def process_youtube(url: str, lang_display: str, progress: gr.Progress = gr.Prog
     progress(0.3, desc="Fetching transcript…")
     start = time.monotonic()
     try:
-        markdown = fetch_youtube(url)
+        markdown = fetch_youtube(url, api_key=api_key.strip() if api_key else "")
     except RuntimeError as exc:
         raise gr.Error(str(exc))
 
     progress(1, desc="Done")
+    return _emit(markdown, time.monotonic() - start, label="YouTube")
+
+
+def process_youtube_paste(raw_text: str, lang_display: str):
+    lang = _lang_key(lang_display)
+    if not raw_text or not raw_text.strip():
+        raise gr.Error(t(lang, "err_no_text"))
+
+    start = time.monotonic()
+    markdown = format_plain_text(raw_text)
+
+    if not markdown.strip():
+        raise gr.Error(t(lang, "err_no_content"))
+
     return _emit(markdown, time.monotonic() - start, label="YouTube")
 
 
@@ -273,7 +292,19 @@ def update_ui(lang_display: str):
             label=t(lang, "youtube_label"), placeholder=t(lang, "youtube_placeholder")
         ),
         gr.update(value=t(lang, "youtube_hint")),
+        gr.update(label=t(lang, "youtube_apikey_accordion")),
+        gr.update(value=t(lang, "youtube_apikey_hint")),
+        gr.update(
+            label=t(lang, "youtube_apikey_label"),
+            placeholder=t(lang, "youtube_apikey_placeholder"),
+        ),
         gr.update(value=t(lang, "youtube_btn")),
+        gr.update(
+            label=t(lang, "youtube_paste_label"),
+            placeholder=t(lang, "youtube_paste_placeholder"),
+        ),
+        gr.update(value=t(lang, "youtube_paste_hint")),
+        gr.update(value=t(lang, "youtube_paste_btn")),
         gr.update(label=t(lang, "audio_label")),
         gr.update(value=t(lang, "audio_hint", max_mb=_MAX_AUDIO_MB)),
         gr.update(
@@ -306,6 +337,8 @@ def clear(lang_display: str):
     lang = _lang_key(lang_display)
     return (
         gr.update(value=[]),
+        gr.update(value=""),
+        gr.update(value=""),
         gr.update(value=""),
         gr.update(value=""),
         gr.update(value=""),
@@ -385,16 +418,59 @@ with gr.Blocks(title=APP_TITLE) as demo:
                     )
 
                 with gr.Tab(t(_DEFAULT_LANG, "tab_youtube")):
-                    youtube_input = gr.Textbox(
-                        label=t(_DEFAULT_LANG, "youtube_label"),
-                        placeholder=t(_DEFAULT_LANG, "youtube_placeholder"),
-                        lines=1,
-                        max_lines=1,
-                    )
-                    youtube_hint = gr.Markdown(value=t(_DEFAULT_LANG, "youtube_hint"))
-                    convert_youtube_btn = gr.Button(
-                        t(_DEFAULT_LANG, "youtube_btn"), variant="primary", size="lg"
-                    )
+                    with gr.Tabs():
+                        with gr.Tab(
+                            t(_DEFAULT_LANG, "youtube_subtab_auto")
+                        ) as youtube_tab_auto:
+                            youtube_input = gr.Textbox(
+                                label=t(_DEFAULT_LANG, "youtube_label"),
+                                placeholder=t(_DEFAULT_LANG, "youtube_placeholder"),
+                                lines=1,
+                                max_lines=1,
+                            )
+                            youtube_hint = gr.Markdown(
+                                value=t(_DEFAULT_LANG, "youtube_hint")
+                            )
+                            with gr.Accordion(
+                                t(_DEFAULT_LANG, "youtube_apikey_accordion"),
+                                open=False,
+                            ) as youtube_apikey_accordion:
+                                youtube_apikey_hint = gr.Markdown(
+                                    value=t(_DEFAULT_LANG, "youtube_apikey_hint")
+                                )
+                                youtube_apikey_input = gr.Textbox(
+                                    label=t(_DEFAULT_LANG, "youtube_apikey_label"),
+                                    placeholder=t(
+                                        _DEFAULT_LANG, "youtube_apikey_placeholder"
+                                    ),
+                                    type="password",
+                                    lines=1,
+                                    max_lines=1,
+                                )
+                            convert_youtube_btn = gr.Button(
+                                t(_DEFAULT_LANG, "youtube_btn"),
+                                variant="primary",
+                                size="lg",
+                            )
+                        with gr.Tab(
+                            t(_DEFAULT_LANG, "youtube_subtab_paste")
+                        ) as youtube_tab_paste:
+                            youtube_paste_input = gr.Textbox(
+                                label=t(_DEFAULT_LANG, "youtube_paste_label"),
+                                placeholder=t(
+                                    _DEFAULT_LANG, "youtube_paste_placeholder"
+                                ),
+                                lines=10,
+                                max_lines=40,
+                            )
+                            youtube_paste_hint = gr.Markdown(
+                                value=t(_DEFAULT_LANG, "youtube_paste_hint")
+                            )
+                            convert_youtube_paste_btn = gr.Button(
+                                t(_DEFAULT_LANG, "youtube_paste_btn"),
+                                variant="primary",
+                                size="lg",
+                            )
 
                 with gr.Tab(t(_DEFAULT_LANG, "tab_audio")):
                     audio_input = gr.File(
@@ -483,7 +559,13 @@ with gr.Blocks(title=APP_TITLE) as demo:
         convert_text_btn,
         youtube_input,
         youtube_hint,
+        youtube_apikey_accordion,
+        youtube_apikey_hint,
+        youtube_apikey_input,
         convert_youtube_btn,
+        youtube_paste_input,
+        youtube_paste_hint,
+        convert_youtube_paste_btn,
         audio_input,
         audio_hint,
         audio_provider_radio,
@@ -533,7 +615,14 @@ with gr.Blocks(title=APP_TITLE) as demo:
         fn=process_text, inputs=[text_input, lang_selector], outputs=_outputs
     )
     convert_youtube_btn.click(
-        fn=process_youtube, inputs=[youtube_input, lang_selector], outputs=_outputs
+        fn=process_youtube,
+        inputs=[youtube_input, youtube_apikey_input, lang_selector],
+        outputs=_outputs,
+    )
+    convert_youtube_paste_btn.click(
+        fn=process_youtube_paste,
+        inputs=[youtube_paste_input, lang_selector],
+        outputs=_outputs,
     )
     convert_audio_btn.click(
         fn=process_audio,
@@ -543,7 +632,15 @@ with gr.Blocks(title=APP_TITLE) as demo:
     clear_btn.click(
         fn=clear,
         inputs=[lang_selector],
-        outputs=[file_input, url_input, text_input, youtube_input, audio_input]
+        outputs=[
+            file_input,
+            url_input,
+            text_input,
+            youtube_input,
+            youtube_apikey_input,
+            youtube_paste_input,
+            audio_input,
+        ]
         + _outputs,
     )
     lang_selector.change(fn=update_ui, inputs=[lang_selector], outputs=_ui_components)

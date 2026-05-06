@@ -16,6 +16,20 @@ Deployments to Hugging Face Spaces happen automatically when a `vX.Y.Z` tag is p
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-05-06
+
+### Added
+- YouTube tab now has two subtabs: **Auto-extract** (URL input) and **Paste transcript** (manual paste → format as Markdown)
+- Three-layer extraction cascade in Auto-extract: yt-dlp → youtube-transcript-api → YouTube Data API v3 (BYOK)
+- Optional YouTube Data API v3 key field (accordion, BYOK, password field — key never stored) for accessing manually uploaded captions
+- Paste subtab: fallback when auto-extraction fails — paste any transcript and format it to Markdown instantly
+- Error message now includes a tip pointing to youtubetotranscript.com when all automatic methods fail
+- All new UI strings translated in all 10 languages
+
+### Changed
+- youtube-transcript-api is now the second fallback instead of the only method
+- yt-dlp added to requirements (more robust subtitle extraction, handles auto-generated captions)
+
 ## [1.7.0] — 2026-05-06
 
 ### Changed
