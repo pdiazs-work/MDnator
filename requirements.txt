@@ -3,6 +3,6 @@ yt-dlp==2026.3.17
 pillow==12.2.0
 requests==2.33.1
 openai==2.32.0
-faster-whisper==1.1.1
+faster-whisper==1.2.1
 youtube-transcript-api==1.2.4
 google-generativeai==0.8.5
